@@ -197,6 +197,7 @@ function onFrame(time, frame) {
     const key = `${o.slot}:${p.id}`, oi = o.info || {}, wrist = p.id === 'wrist', olay = wrist ? SysMenu.layout(oi.sys) : C.menu(S.stateOf(o.slot), oi);
     const q = panelsAll.get(key), cur = q && q.pose ? q.pose : p.pose, k = 1 - Math.exp(-dt * 18);
     const eased = { x: cur.x + (p.pose.x - cur.x) * k, y: cur.y + (p.pose.y - cur.y) * k, h: cur.h + (p.pose.h - cur.h) * k, yaw: cur.yaw + M.util.wrap(p.pose.yaw - cur.yaw) * k, pitch: p.pose.pitch };
+    if (p.pose.q) { const a = cur.q || p.pose.q, b = p.pose.q, d = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3] < 0 ? -1 : 1, m = a.map((v, i) => v + (b[i] * d - v) * k), l = Math.hypot(...m) || 1; eased.q = m.map((v) => v / l); }
     list.push({ key, owner: o.slot, id: p.id, pose: eased, w: wrist ? SysMenu.width(oi.sys) : 0.42, lay: olay });
     want.add(key);
   }

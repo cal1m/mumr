@@ -193,3 +193,24 @@ test('a given frame (a PC rehearsal) lines up without spots', () => {
   L.update(0, 0.016, []);
   assert.deepStrictEqual([sp.ok, S.myLine.how], [true, 'given']);
 });
+
+test('a card with an orientation: the quaternion from its axes, the poke test on those axes, and the other headset gets the same real turn', () => {
+  const AL = M.align, n = (v) => { const l = Math.hypot(...v); return v.map((c) => c / l); };
+  const X = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const r = n([1, 0.3, -0.2]), up = n(X([0.2, 0.4, 1], r)), nrm = X(r, up);
+  const q = AL.quatFromBasis(r, up, nrm);
+  AL.quatApply(q, [1, 0, 0]).forEach((v, i) => near(v, r[i], 1e-6));
+  AL.quatApply(q, [0, 0, 1]).forEach((v, i) => near(v, nrm[i], 1e-6));
+  const A = M.menus.axes({ x: 0, y: 0, h: 1, q });
+  A.normal.forEach((v, i) => near(v, nrm[i], 1e-6));
+  // through the M packet to a headset turned 0.7 rad: its own XR turn of the card is the same real turn
+  const hub = new Hub();
+  const mk = (name, frame) => { const S = new M.session.Session(hub.link(name), {}); const sp = new AL.Space(frame, 0); const mn = new M.menus.Menus(S, sp); S.link.onBin = (b) => mn.receive(M.wire.decode(b), 0); return { S, sp, mn }; };
+  const a = mk('A', { x: 0, y: 0, yaw: 0, z: 0 }), b = mk('B', { x: 1, y: 0.5, yaw: 0.7, z: 0 });
+  hub.flush(); a.S.setLined({ dist: 3 }); b.S.setLined({ dist: 3 }); hub.flush();
+  a.mn.send(0, [{ id: 'wrist', pose: { x: 0.2, y: 0.1, h: 1.1, q } }], {}); hub.flush();
+  const got = b.mn.others(0)[0].panels[0].pose;
+  assert.ok(got.q, 'it came with an orientation');
+  const backToCommon = b.sp.quatToCommon(got.q), sent = a.sp.quatToCommon(q);
+  AL.quatApply(backToCommon, [0, 0, 1]).forEach((v, i) => near(v, AL.quatApply(sent, [0, 0, 1])[i], 1e-3, 'the same real turn'));
+});

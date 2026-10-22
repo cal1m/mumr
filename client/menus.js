@@ -42,7 +42,9 @@
     return null;
   }
 
+  // A pose may instead carry `q`, an XR orientation [x, y, z, w] (a card on a wrist turns with the wrist): then yaw and pitch are not used.
   function axes(p) {
+    if (p.q) { const A = M.align; return { pos: [p.x, p.h, -p.y], right: A.quatApply(p.q, [1, 0, 0]), up: A.quatApply(p.q, [0, 1, 0]), normal: A.quatApply(p.q, [0, 0, 1]), q: p.q }; }
     const ry = Math.atan2(Math.cos(p.yaw), -Math.sin(p.yaw)), sp = Math.sin(p.pitch || 0), cp = Math.cos(p.pitch || 0), sr = Math.sin(ry), cr = Math.cos(ry);
     return { pos: [p.x, p.h, -p.y], right: [cr, 0, -sr], up: [-sr * sp, cp, -cr * sp], normal: [sr * cp, sp, cr * cp], ry, pitch: p.pitch || 0 };
   }
@@ -104,7 +106,12 @@
       if (!sp.ok || !S.sending() || nowMs - this._sentAt < this.every) return false;
       this._sentAt = nowMs;
       const r3 = (v) => Math.round(v * 1000) / 1000, r4 = (v) => Math.round(v * 1e4) / 1e4;
-      const rows = (panels || []).map((p) => { const c = sp.poseToCommon({ x: p.pose.x, y: p.pose.y, yaw: p.pose.yaw, h: p.pose.h - sp.floorY }); return [p.id, r3(c.x), r3(c.y), r3(c.h), r4(c.yaw), r4(p.pose.pitch || 0)]; });
+      // a row: [id, x, y, h, yaw, pitch], or [id, x, y, h, qx, qy, qz, qw] for a pose with an orientation (a wrist card)
+      const rows = (panels || []).map((p) => {
+        const c = sp.poseToCommon({ x: p.pose.x, y: p.pose.y, yaw: p.pose.yaw || 0, h: p.pose.h - sp.floorY });
+        if (p.pose.q) return [p.id, r3(c.x), r3(c.y), r3(c.h)].concat(sp.quatToCommon(p.pose.q).map(r4));
+        return [p.id, r3(c.x), r3(c.y), r3(c.h), r4(c.yaw), r4(p.pose.pitch || 0)];
+      });
       const ok = S.link.sendBin(M.wire.encode('menus', { panels: rows, info: info || null }, nowMs));
       if (ok) this.stats.sent++;
       return !!ok;
@@ -125,6 +132,11 @@
         const panels = [];
         for (const r of m.rows) {
           if (!Array.isArray(r) || r.length < 6 || typeof r[0] !== 'string' || !r.slice(1, 6).every(Number.isFinite) || !this.known(r[0])) continue;
+          if (r.length >= 8 && r.slice(4, 8).every(Number.isFinite)) {
+            const o = sp.poseFromCommon({ x: r[1], y: r[2], h: r[3], yaw: 0 });
+            panels.push({ id: r[0], pose: { x: o.x, y: o.y, h: o.h + sp.floorY, yaw: 0, pitch: 0, q: sp.quatFromCommon(r.slice(4, 8)) } });
+            continue;
+          }
           const o = sp.poseFromCommon({ x: r[1], y: r[2], h: r[3], yaw: r[4] });
           panels.push({ id: r[0], pose: { x: o.x, y: o.y, h: o.h + sp.floorY, yaw: o.yaw, pitch: r[5] } });
         }

@@ -97,7 +97,12 @@ export function makePanels(THREE, renderer) {
       this.handle.scale.setScalar(state === 'idle' ? 1 : 1.3);
     }
     // pose: { x, y (floor plan), h (XR height), yaw, pitch }, as menus.axes takes it
-    pose(p) { this.mesh.position.set(p.x, p.h, -p.y); this.mesh.rotation.set(-(p.pitch || 0), Math.atan2(Math.cos(p.yaw), -Math.sin(p.yaw)), 0, 'YXZ'); this.mesh.updateMatrixWorld(true); }
+    pose(p) {
+      this.mesh.position.set(p.x, p.h, -p.y);
+      if (p.q) this.mesh.quaternion.set(p.q[0], p.q[1], p.q[2], p.q[3]);          // (a card that turns with a wrist)
+      else this.mesh.rotation.set(-(p.pitch || 0), Math.atan2(Math.cos(p.yaw), -Math.sin(p.yaw)), 0, 'YXZ');
+      this.mesh.updateMatrixWorld(true);
+    }
     dispose() { if (this.mesh.parent) this.mesh.parent.remove(this.mesh); this.plane.geometry.dispose(); this.material.dispose(); if (this.tex) this.tex.dispose(); if (this.handle) this.handle.material.dispose(); }
   }
   return { Panel, drawGrid };

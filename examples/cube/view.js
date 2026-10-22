@@ -80,7 +80,7 @@ function frame() {
       if (!q) { q = o.panels[id] = { panel: new Panel(0.42, lay), key: '' }; scene.add(q.panel.mesh); }
       q.panel.setWidth(wrist ? M.sysmenu.SysMenu.width(info.sys) : 0.42);
       q.panel.mesh.visible = true;
-      q.panel.pose({ x: row[1], y: row[2], h: row[3], yaw: row[4], pitch: row[5] });
+      q.panel.pose(row.length >= 8 ? { x: row[1], y: row[2], h: row[3], q: row.slice(4, 8) } : { x: row[1], y: row[2], h: row[3], yaw: row[4], pitch: row[5] });
       const look = { edge: PLAYER_COLOURS[p.slot % PLAYER_COLOURS.length], note: wrist ? (info.sys && info.sys.note) || '' : `player ${p.slot + 1}` };
       const key = JSON.stringify([lay.w, lay.h, lay.buttons.map((b) => [b.label, b.value, b.active, b.off]), look.note]);
       if (key !== q.key) { q.key = key; q.panel.draw(lay, look); }        // (only when it changed: a redraw is a canvas and a texture upload)

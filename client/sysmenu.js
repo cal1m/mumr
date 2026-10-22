@@ -13,7 +13,7 @@
 //   place(head, jp, floorY)  where it floats this frame (a panel pose), or null while the wrist does not look at you
 (function (M) {
   const OWN = ['sysOpen', 'sysClose', 'exit', 'roomSetup'];
-  const OPEN_W = 0.26, FOLDED_W = 0.06;
+  const OPEN_W = 0.22, FOLDED_W = 0.06;
   const WRIST_SIDE = 'left';
 
   class SysMenu {
@@ -50,9 +50,10 @@
           { id: 'exit', label: 'Exit', value: 'leave MR' },
         ]] });
     }
-    // Where it floats: at the inside of the left wrist (follow.js wristCard), turned to the eyes; shown while that side of the wrist looks at you
-    // (with some slack, so that it does not flicker at the edge). head: [x, y, heading, height above the floor, pitch]; jp: that hand's 25 joints
-    // in XR space (null: the hand is not tracked). -> a panel pose { x, y, h (XR), yaw, pitch } or null
+    // Where it is: a card lying on the inside of the left wrist and turning with it, as Nudgy's wrist card did (follow.js wristCard: a little up
+    // the forearm, clear of the skin, its top the top for whoever looks at it); shown while that side of the wrist looks at you (with some slack,
+    // so that it does not flicker at the edge). head: [x, y, heading, height above the floor, pitch]; jp: that hand's 25 joints
+    // in XR space (null: the hand is not tracked). -> a panel pose { x, y, h (XR), q (its orientation in XR space) } or null
     place(head, jp, floorY) {
       if (!jp || !head) { this.shown = false; return (this.pose = null); }
       const at = (i) => [jp[i * 3], jp[i * 3 + 1], jp[i * 3 + 2]];
@@ -62,9 +63,10 @@
       const W = M.follow.WRIST;
       this.shown = c.dist < W.far && c.facing > (this.shown ? W.hide : W.show);
       if (!this.shown) return (this.pose = null);
-      const k = this.open ? 0.10 : 0.01, p = [c.pos[0] + c.normal[0] * k, c.pos[1] + c.normal[1] * k, c.pos[2] + c.normal[2] * k];
-      const x = p[0], y = -p[2], dx = head[0] - x, dy = head[1] - y;
-      return (this.pose = { x, y, h: p[1], yaw: Math.atan2(dy, dx), pitch: 0.8 * Math.atan2(eye[1] - p[1], Math.max(0.1, Math.hypot(dx, dy))) });
+      // (open, the card is larger: its middle goes a little further up the forearm, so that it does not cover the hand)
+      const arm = [at(0)[0] - at(11)[0], at(0)[1] - at(11)[1], at(0)[2] - at(11)[2]], al = Math.hypot(arm[0], arm[1], arm[2]) || 1, k = this.open ? 0.07 : 0;
+      const p = [0, 1, 2].map((i) => c.pos[i] + (arm[i] / al) * k);
+      return (this.pose = { x: p[0], y: -p[2], h: p[1], yaw: 0, pitch: 0, q: M.align.quatFromBasis(c.right, c.up, c.normal) });
     }
   }
 

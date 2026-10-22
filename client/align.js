@@ -336,6 +336,23 @@
     return [c * x2 + s * z2, c * y2 + s * w2, c * z2 - s * x2, c * w2 - s * y2];
   }
 
+  // The quaternion [x, y, z, w] of the turn whose axes are r (x), u (y) and n (z): three unit vectors at right angles
+  function quatFromBasis(r, u, n) {
+    const m00 = r[0], m01 = u[0], m02 = n[0], m10 = r[1], m11 = u[1], m12 = n[1], m20 = r[2], m21 = u[2], m22 = n[2], tr = m00 + m11 + m22;
+    let x, y, z, w;
+    if (tr > 0) { const s = 0.5 / Math.sqrt(tr + 1); w = 0.25 / s; x = (m21 - m12) * s; y = (m02 - m20) * s; z = (m10 - m01) * s; }
+    else if (m00 > m11 && m00 > m22) { const s = 2 * Math.sqrt(1 + m00 - m11 - m22); w = (m21 - m12) / s; x = 0.25 * s; y = (m01 + m10) / s; z = (m02 + m20) / s; }
+    else if (m11 > m22) { const s = 2 * Math.sqrt(1 + m11 - m00 - m22); w = (m02 - m20) / s; x = (m01 + m10) / s; y = 0.25 * s; z = (m12 + m21) / s; }
+    else { const s = 2 * Math.sqrt(1 + m22 - m00 - m11); w = (m10 - m01) / s; x = (m02 + m20) / s; y = (m12 + m21) / s; z = 0.25 * s; }
+    const l = Math.hypot(x, y, z, w) || 1;
+    return [x / l, y / l, z / l, w / l];
+  }
+  // a vector v turned by the quaternion q = [x, y, z, w]
+  function quatApply(q, v) {
+    const [x, y, z, w] = q, ix = w * v[0] + y * v[2] - z * v[1], iy = w * v[1] + z * v[0] - x * v[2], iz = w * v[2] + x * v[1] - y * v[0], iw = -x * v[0] - y * v[1] - z * v[2];
+    return [ix * w + iw * -x + iy * -z - iz * -y, iy * w + iw * -y + iz * -x - ix * -z, iz * w + iw * -z + ix * -y - iy * -x];
+  }
+
   // One headset's way into the common frame and back: its frame (from a line-up: where the common frame lies in this headset's floor
   // plan, and frame.z, the common floor's height above this headset's own floor) and floorY (where this headset's floor is in its XR
   // space). Everything that is sent goes through here; nothing else should know the conventions:
@@ -364,5 +381,5 @@
     poseFromCommon(p) { const c = fromCommon(this.frame, p.x, p.y); return Object.assign({}, p, { x: c[0], y: c[1], yaw: yawFromCommon(this.frame, p.yaw || 0), h: (p.h || 0) + this.fz }); }
   }
 
-  M.align = { fromPoints, fromPose, fromCommon, toCommon, yawToCommon, yawFromCommon, between, apply, invert, errorAt, IDENTITY, wrap, frameFromPose, compose, poseIn, turnQ, Space, Resets, Aligner, DEF, AXES };
+  M.align = { fromPoints, fromPose, fromCommon, toCommon, yawToCommon, yawFromCommon, between, apply, invert, errorAt, IDENTITY, wrap, frameFromPose, compose, poseIn, turnQ, quatFromBasis, quatApply, Space, Resets, Aligner, DEF, AXES };
 })(typeof module !== 'undefined' ? (module.exports = require('./ns.js')) : (globalThis.MUMR = globalThis.MUMR || {}));
