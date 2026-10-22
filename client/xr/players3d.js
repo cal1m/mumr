@@ -1,11 +1,11 @@
-// Drawing the other players (the hands as ghost fingers in that player's colour, a cone for the head, the legs: legs3d.js) and the marks for lining up (a
+// Drawing the other players (the hands as ghost fingers in that player's colour, a cone for the head, the feet as shoes: feet3d.js) and the marks for lining up (a
 // disc with a cross and a number on a short pole at each of this player's two spots, a ring that fills while a spot is being taken, a
 // disc with a 3 for every check mark, three knobs at each spot). From Nudgy (simulator/mr/players3d.js), without the camera knobs.
 //
 // Everything here is given on this headset's floor plan (x, y on the floor, z up): presence.js and lineup.js have already turned
 // what came from the others out of the common frame. `world` is the group whose origin is on the real floor; inside it the floor
 // plan (x, y, z) sits at THREE (x, z, -y). The ghost hands live in `scene` directly (XR space), as this page's own do.
-import { makeLegs } from './legs3d.js';
+import { makeShoes } from './feet3d.js';
 export const PLAYER_COLOURS = [0x4ea1ff, 0xff9f43, 0x7bd88f, 0xff6b81];
 
 export function createPlayers({ THREE, world, scene, GhostHand }) {
@@ -19,7 +19,7 @@ export function createPlayers({ THREE, world, scene, GhostHand }) {
     const head = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.16, 20), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.75 }));
     head.geometry.rotateZ(-Math.PI / 2); head.visible = false; world.add(head);
     const dots = [0, 1, 2, 3].map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.012, 12, 8), new THREE.MeshBasicMaterial({ color: col })); m.visible = false; world.add(m); return m; });
-    const o = { slot, col, head, dots, hands: {}, seen: {}, legs: makeLegs(THREE, world, col) };
+    const o = { slot, col, head, dots, hands: {}, seen: {}, feet: makeShoes(THREE, world, col) };
     others.set(slot, o);
     return o;
   }
@@ -27,7 +27,7 @@ export function createPlayers({ THREE, world, scene, GhostHand }) {
     world.remove(o.head); o.head.geometry.dispose(); o.head.material.dispose();
     for (const d of o.dots) { world.remove(d); d.geometry.dispose(); d.material.dispose(); }
     for (const h of Object.values(o.hands)) h.ghost.dispose();
-    o.legs.dispose();
+    o.feet.dispose();
     others.delete(o.slot);
   }
 
@@ -58,7 +58,7 @@ export function createPlayers({ THREE, world, scene, GhostHand }) {
         } else if (!s.foot) for (const q of s.points || []) if (nd < o.dots.length) { const d = o.dots[nd++]; d.visible = true; d.position.copy(toV(q.x, q.y, q.z)); }
       }
       for (; nd < o.dots.length; nd++) o.dots[nd].visible = false;
-      o.legs.update(globalThis.MUMR.hands.legs(p.head, p.sources));             // (tracked, or estimated from the head: always visible)
+      o.feet.update(p.sources);                                                    // (only when that player's app turned feet on)
       for (const [id, h] of Object.entries(o.hands)) if (!used.has(id)) { h.ghost.mesh.visible = false; h.fresh = true; }
     }
     for (const o of [...others.values()]) if (!here.has(o.slot)) drop(o);

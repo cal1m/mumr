@@ -23,7 +23,7 @@ export function makeCube(THREE, size) {
   g.userData = { box, edges, outline, label, canvas, tex, holder, size, text: null };
   return g;
 }
-// d: { x, y, z, yaw, held } on the floor plan of whatever group the cube is in (inside it the floor plan (x, y, z) is THREE (x, z, -y)).
+// d: { x, y, z, yaw, held, pointed } on the floor plan of whatever group the cube is in (inside it the floor plan (x, y, z) is THREE (x, z, -y)).
 // owner: { text, colour } of whoever simulates it now, or null. The label group must be added to the same parent as the cube once:
 // parent.add(cube.userData.holder).
 export function setCube(g, d, colour, owner) {
@@ -31,7 +31,7 @@ export function setCube(g, d, colour, owner) {
   g.position.set(d.x, d.z, -d.y);
   g.rotation.set(0, d.yaw, 0);
   u.box.material.color.set(colour);
-  u.edges.material.color.set(d.held ? 0xffffff : 0x14161c);
+  u.edges.material.color.set(d.held ? 0xffffff : d.pointed ? 0xf2c14e : 0x14161c);      // (white: held; yellow: somebody points at it)
   u.outline.visible = u.label.visible = !!owner;
   if (!owner) return;
   u.outline.material.color.set(owner.colour);

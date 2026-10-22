@@ -4,8 +4,10 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PLAYER_COLOURS } from '/mumr/xr/players3d.js';
 import { makePanels } from '/mumr/xr/panel3d.js';
-import { makeLegs } from '/mumr/xr/legs3d.js';
+import { makeShoes } from '/mumr/xr/feet3d.js';
 import { createRoom3d } from '/mumr/xr/room3d.js';
+import { createHandWall } from '/mumr/xr/handwall.js';
+import { createPointers } from '/mumr/xr/pointer3d.js';
 import { makeCube, setCube, ownerOf } from './draw.js';
 
 // DELAY: how far in the past the world is drawn, so that it can be blended between packets (they come every 22 ms); ?delay=ms changes it
@@ -22,7 +24,10 @@ const world = new THREE.Group(); scene.add(world);
 world.add(new THREE.GridHelper(8, 40, 0x55607a, 0x353b4a));
 const cubeMesh = makeCube(THREE, C.SIZE); world.add(cubeMesh, cubeMesh.userData.holder);
 const { Panel } = makePanels(THREE, renderer);
-const room3d = createRoom3d({ THREE, parent: world });     // (the room as the supplier sent it: the common frame is this page's floor plan)
+const room3d = createRoom3d({ THREE, parent: world });
+// the hand wall and the pointing rays, as the headsets draw them (worked out here from everybody's joints, as each headset does)
+const handWall = createHandWall({ THREE, parent: world }), pointers = createPointers({ THREE, parent: world }), grips = new M.grab.Grips();
+const hex = (c) => `#${(c >>> 0).toString(16).padStart(6, '0')}`;     // (the room as the supplier sent it: the common frame is this page's floor plan)
 const toV = (x, y, z) => new THREE.Vector3(x, z, -y);
 
 const info = await fetch('/info').then((r) => r.json()).catch(() => ({ build: 0 }));
@@ -42,7 +47,7 @@ function playerObj(slot) {
   const check = new THREE.Mesh(new THREE.RingGeometry(0.045, 0.06, 32), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide }));
   check.rotation.x = -Math.PI / 2;
   world.add(headM, dots, check);
-  o = { headM, dots, check, panels: {}, legs: makeLegs(THREE, world, col) };
+  o = { headM, dots, check, panels: {}, feet: makeShoes(THREE, world, col) };
   drawn.set(slot, o);
   return o;
 }
@@ -54,7 +59,7 @@ function frame() {
   room3d.set(S.doc.room ? S.doc.room.data : null);
   const c = feed.sample('cube', null, at);
   if (c) setCube(cubeMesh, { x: c.data[0], y: c.data[1], z: c.data[2], yaw: c.data[3], held: c.data[7] > 0.5 }, C.COLOURS[(S.doc.game.colour || 0) % C.COLOURS.length], ownerOf(S.holder('cube'), null, PLAYER_COLOURS));
-  const here = new Set();
+  const here = new Set(), everyone = [];
   let dist = null;
   for (const p of feed.players()) {
     here.add(p.slot);
@@ -69,7 +74,8 @@ function frame() {
       for (const s of pr.data.sources) if (!s.foot) for (const q of (s.joints || s.points.map((x) => [x.x, x.y, x.z]))) if (n < 160) { const v = toV(q[0], q[1], q[2]); mtx.makeTranslation(v.x, v.y, v.z); o.dots.setMatrixAt(n++, mtx); }
     }
     o.dots.count = n; o.dots.instanceMatrix.needsUpdate = true;
-    o.legs.update(pr ? M.hands.legs(pr.data.head, pr.data.sources) : []);
+    o.feet.update(pr ? pr.data.sources : []);
+    if (pr) for (const s of pr.data.sources) if (!s.foot) everyone.push(Object.assign({}, s, { id: `p${p.slot}-${s.id}`, slot: p.slot }));
     o.check.visible = !!p.check;
     if (p.check) o.check.position.copy(toV(p.check[0], p.check[1], (p.check[2] || 0) + 0.003));
     // that player's menus, where they float, drawn from its own state and mode (the same layouts the headsets draw): the cube's menu ('main')
@@ -89,7 +95,14 @@ function frame() {
       if (key !== q.key) { q.key = key; q.panel.draw(lay, look); }        // (only when it changed: a redraw is a canvas and a texture upload)
     }
   }
-  for (const [slot, o] of [...drawn]) if (!here.has(slot)) { for (const x of [o.headM, o.dots, o.check]) world.remove(x); for (const q of Object.values(o.panels)) q.panel.dispose(); o.legs.dispose(); drawn.delete(slot); }
+  for (const [slot, o] of [...drawn]) if (!here.has(slot)) { for (const x of [o.headM, o.dots, o.check]) world.remove(x); for (const q of Object.values(o.panels)) q.panel.dispose(); o.feet.dispose(); drawn.delete(slot); }
+  const gestures = grips.update(everyone), roomNow = S.doc.room ? S.doc.room.data : null;
+  handWall.update(roomNow, gestures.map((g) => { const s = everyone.find((q) => q.id === g.id); return { name: `player ${s.slot + 1}, ${/left/.test(g.id) ? 'left' : 'right'}`, colour: hex(PLAYER_COLOURS[s.slot % PLAYER_COLOURS.length]), source: s, g }; }), performance.now());
+  const box = c ? { id: 'cube', label: 'cube', x: c.data[0], y: c.data[1], z: c.data[2], half: C.HALF, yaw: c.data[3] } : null;
+  pointers.update(gestures.filter((g) => g.point).map((g) => {
+    const hit = M.grab.pointAt(g.point, box ? [box] : [], roomNow, 8), s = everyone.find((q) => q.id === g.id);
+    return { from: g.point.from, at: hit ? hit.at : g.point.from.map((v, i) => v + g.point.dir[i] * 3), label: hit ? hit.label || hit.what : '', colour: PLAYER_COLOURS[s.slot % PLAYER_COLOURS.length] };
+  }));
   spots[0].visible = spots[1].visible = dist !== null;
   if (dist !== null) spots[1].position.set(dist, 0.002, 0);
   const st = feed.status();

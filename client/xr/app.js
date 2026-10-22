@@ -1,6 +1,7 @@
 // The page wiring every MUMR app repeats, in one call (an ES module; THREE and OrbitControls are handed in). It makes the renderer, scene,
 // floor and desktop camera; the link, the session, the line-up, the engine's wrist menu, everybody's menus (with the handle under this
-// player's own and the fingertip press), presence with the legs, the ghost fingers, the other players, the anchor keeper; entering and
+// player's own and the fingertip press), presence, the ghost fingers, the hand cutouts, the feet (if asked), everybody's gestures
+// (grab.js), the other players, the anchor keeper; entering and
 // leaving mixed reality; the desktop rehearsal (?name=A&frame=x,y,deg: a pretend line-up, the mouse as a fingertip, Shift a pinch, a click
 // on any menu presses it, ?room=demo a pretend room scan); the room (room.js: the server's, uploaded by a headset; drawn as outlines on the
 // desktop and while lining up); giving bodies up while nobody looks at the page; the status line and reloading on a new build.
@@ -16,16 +17,25 @@
 //     ghostColour(id, own, grip) -> colour | 'grips',    (optional) this page's ghost fingers' colour for hand `id` (grip: its grab.js
 //                                                        state); 'grips' colours a pinch and a fist (GHOST_COLOURS); default: never changes
 //     status() -> text,                                  (optional) the app's part of the status line
+//     feet: 'off' | 'show' | 'kick',                     (optional) the feet from body tracking as shoes: off (default), shown to
+//                                                        everybody, or also given to the app's simulation as sources that may push
+//     handMask: true,                                    (optional) the hand cutouts: real hands in front of everything (default on;
+//                                                        app.handMask.enabled switches them while the page runs)
+//     handWall: false,                                   (optional) the hand window on the room's longest wall (handwall.js)
 //     anchorKey, name })                                 (optional) where the anchor is kept; who this page is in the log
-//   app: { THREE, scene, world, camera, S, space, presence, menus, lineup, sys, room, grips, life, say, head(), xr(), bodies, ownerText(slot) }
+//   app: { THREE, scene, world, camera, S, space, presence, menus, lineup, sys, room, grips, handMask, feet, life, say, head(), xr(), bodies,
+//          ownerText(slot), gestures (this frame: everybody's hands' grab.js states), everyone (this frame: everybody's hand sources) }
 //   (app.room.local(): the room in this page's floor plan, for the app's physics: room.js support / pushOut)
 // The page needs the elements #view (canvas), #enter, #xrNote, #say, #status.
 import { enterXR } from './session.js';
-import { readInput, readLegs, readPlanes } from './input.js';
+import { readInput, readFeet, readPlanes } from './input.js';
 import { makeGhost, GHOST_COLOURS } from './ghost.js';
 import { createPlayers, PLAYER_COLOURS } from './players3d.js';
 import { makePanels } from './panel3d.js';
 import { createRoom3d } from './room3d.js';
+import { makeShoes } from './feet3d.js';
+import { createHandMask } from './handmask.js';
+import { createHandWall } from './handwall.js';
 
 export { GHOST_COLOURS, PLAYER_COLOURS };
 const HOST = 15, MENU_W = 0.42;
@@ -54,6 +64,10 @@ export async function createApp(o) {
   const players = createPlayers({ THREE, world, scene, GhostHand });
   const { Panel } = makePanels(THREE, renderer);
   const room3d = createRoom3d({ THREE, parent: world });
+  const FEET = o.feet || 'off', ownShoes = makeShoes(THREE, world);
+  const handMask = createHandMask({ THREE, renderer, scene });
+  handMask.enabled = o.handMask !== false;
+  const handWall = o.handWall ? createHandWall({ THREE, parent: world }) : null;
   const mouseDot = new THREE.Mesh(new THREE.SphereGeometry(0.012, 12, 8), new THREE.MeshBasicMaterial({ color: 0xf2c14e })); mouseDot.visible = false; world.add(mouseDot);
 
   // ---- the shared world
@@ -176,39 +190,51 @@ export async function createApp(o) {
     camera.getWorldDirection(v3);
     return [camera.position.x, -camera.position.z, Math.atan2(-v3.z, v3.x), camera.position.y, Math.asin(v3.y)];
   }
-  const app = { THREE, scene, world, camera, renderer, S, space, presence, menus, lineup, sys, room, grips, life, say, bodies, ownerText, head: () => head, xr: () => xr };
+  const app = { THREE, scene, world, camera, renderer, S, space, presence, menus, lineup, sys, room, grips, handMask, feet: FEET, life, say, bodies, ownerText,
+    head: () => head, xr: () => xr, gestures: [], everyone: [] };
+  // the hands on the hand wall: everybody's, with their gestures (this page's first, then the others by slot)
+  const hex = (c) => `#${(c >>> 0).toString(16).padStart(6, '0')}`;
+  function wallHands() {
+    return app.gestures.map((g) => {
+      const src = app.everyone.find((s) => s.id === g.id), mine = !src || src.slot === undefined, slot = mine ? S.me : src.slot, side = /left/.test(g.id) ? 'left' : /right/.test(g.id) ? 'right' : g.id;
+      return { name: `${mine ? 'you' : `player ${slot + 1}`}, ${side}`, colour: slot === null ? '#ece9e2' : hex(PLAYER_COLOURS[slot % PLAYER_COLOURS.length]), source: src, g, order: mine ? -1 : slot };
+    }).sort((a, b) => a.order - b.order);
+  }
   function onFrame(time, frame) {
     const now = performance.now(), dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
     if (xr) xr.frame = frame || null;
     if (keeper && frame) keeper.update();
     head = readHead(frame);
     // this page's hands: in mixed reality the tracked hands; on the desktop the mouse while its button is down
-    let own = [], tips = [], legs = [], handsXR = [];
+    let own = [], tips = [], feet = [], handsXR = [];
     if (xr && frame) {
       const r = readInput(xr, frame, space, pinch);
       own = r.sources; handsXR = r.hands; tips = r.hands.map((h) => ({ id: h.id, p: h.tip }));
-      legs = readLegs(xr, frame, space);
+      if (FEET !== 'off') feet = readFeet(xr, frame, space);
       const scan = readPlanes(xr, frame, space, planeState);
       if (scan !== undefined) room.setScan(scan);
-      const ghost = S.stateOf(null).ghost !== false;
-      grips.update(own);
-      for (const id of ['left', 'right']) {
-        const h = r.hands.find((q) => q.id === id && q.jp), g = ghosts[id];
-        if (!h || !ghost) { g.mesh.visible = false; continue; }
-        const gr = grips.of(id);
-        g.update(h.jp, h.jr, o.ghostColour === 'grips' ? GHOST_COLOURS[gr.kind] || GHOST_COLOURS.idle : typeof o.ghostColour === 'function' ? o.ghostColour(id, own, gr) : GHOST_COLOURS.idle);
-      }
     } else if (mouse) {
       own = [{ id: 'mouse', pinch: !!mouse.pinch, points: [{ name: 'index', x: mouse.x, y: mouse.y, z: 0.05 }, { name: 'thumb', x: mouse.x, y: mouse.y, z: 0.05 }] }];
     }
+    // everybody's hands and what they are doing (grab.js): for the ghost fingers' colours, the hand wall and the app
+    app.everyone = presence.hands(own, now);
+    app.gestures = grips.update(app.everyone);
+    const ghost = S.stateOf(null).ghost !== false;
+    for (const id of ['left', 'right']) {
+      const h = handsXR.find((q) => q.id === id && q.jp), g = ghosts[id];
+      if (!h || !ghost) { g.mesh.visible = false; continue; }
+      const gr = grips.of(id);
+      g.update(h.jp, h.jr, o.ghostColour === 'grips' ? GHOST_COLOURS[gr.kind] || GHOST_COLOURS.idle : typeof o.ghostColour === 'function' ? o.ghostColour(id, own, gr) : GHOST_COLOURS.idle);
+    }
+    ownShoes.update(feet);
     mouseDot.visible = !xr && !!mouse;
     if (mouse) mouseDot.position.set(mouse.x, 0.05, -mouse.y);
     // lining up, then everything that is shared
     lineup.update(now, dt, M.hands.tips(own, Object.fromEntries(own.map((s) => [s.id, !!s.pinch]))));
     S.tick(now);
     room.update(now);
-    presence.send(now, head, own.concat(legs));
-    const all = presence.hands(lineup.active ? [] : own, now);         // (a hand that lines up does not touch anything)
+    presence.send(now, head, own.concat(feet));
+    const all = presence.hands(lineup.active ? [] : own.concat(FEET === 'kick' ? feet : []), now);         // (a hand that lines up does not touch anything)
     if (!lineup.active) for (const b of bodies) b.frame(now, own);
     if (o.step) o.step(dt, now / 1000, all, own);
     for (const b of bodies) b.send(now);
@@ -217,6 +243,8 @@ export async function createApp(o) {
     players.marks(lineup.marks());
     world.position.y = space.floorY;
     room3d.set(room.local()); room3d.group.visible = !xr || lineup.active;
+    if (handWall) handWall.update(room.local(), wallHands(), now);
+    if (xr) handMask.update();
     if (o.draw) o.draw(app, now);
     if (!xr) controls.update();
     renderer.render(scene, camera);

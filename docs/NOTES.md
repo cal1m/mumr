@@ -121,6 +121,15 @@ Each item: what is there now in Nudgy, why it costs, what MUMR does instead. **D
     them (a 4 cm slab), every other raised level surface (bed, couch, storage, other) is a block down to the floor; a hand that is
     closing on the cube, or touches it on two sides, does not push it. The engine has grips now (`client/grab.js`: pinch and fist,
     for every app); the ghost fingers keep one colour unless the app asks (`ghostColour: 'grips'`, which the cube does).
+31. **Hands, 2026-10-23** (Marek's list after the second room run). One finger no longer pushed the cube: a pointing hand has three
+    fingers curled, so the "closing on it" rule (item 30) took it for a grip forming; a pointing hand is now excluded. **Done** with the
+    rest of the list: grab.js has the POINT gesture (a ray along the index) and `pointAt` (the app's boxes and the room, room.js `cast`),
+    the PALM platform (Nudgy's: a flat hand, palm up or back up, things can be put on; the cube rides on it until the hand tilts past
+    46 degrees); `xr/handwall.js`, a window on the room's longest wall with every hand's skeleton and its gesture numbers (each page
+    works it out from the joints, so everybody and the PC view see the same without packets); the legs are gone, only the feet as
+    shoes (Nudgy's offsets), off unless the app asks (`feet: 'show' | 'kick'`); the hand cutouts are back (`xr/handmask.js`, Nudgy's
+    mask with its 24 mm tip reach and 3 mm growth), on unless the app turns them off. Not yet on a headset: the gesture thresholds
+    are Nudgy's or estimates, and the hand wall shows the numbers to tune them by.
 
 ## 3. Things that must not be lost (from the Nudgy build)
 

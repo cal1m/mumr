@@ -16,6 +16,7 @@
 // Planes: l the headset's label ('floor', 'wall', 'table', 'couch', 'door frame', ... or 'other'), v true for an upright plane, p the
 // outline, x, y on the floor plan and h the height above the floor (this headset's, or in the common frame the common floor).
 // For an app's physics: kind(plane), support(room, x, y, top), ceiling(room, x, y, bottom), pushOut(room, x, y, z0, z1, r, from),
+// cast(room, from, dir, max) (what a pointing finger points at),
 // walls(room), surfaces(room), blocks(room).
 (function (M) {
   const ACTIONS = ['supplyRoom'];
@@ -194,9 +195,30 @@
     const l = Math.hypot(nx, ny) || 1;
     return { x, y, nx: nx / l, ny: ny / l };
   }
+  // What a ray hits in the room (pointing): the nearest plane of any kind, or the floor -> { t, at: [x, y, z], kind, label } or null.
+  // from, dir: floor plan, dir a unit vector; max: how far to look (m).
+  function cast(room, from, dir, max = 10) {
+    let best = null;
+    const take = (t, kind, label) => { if (t > 1e-4 && t <= max && (!best || t < best.t)) best = { t, at: [from[0] + dir[0] * t, from[1] + dir[1] * t, from[2] + dir[2] * t], kind, label }; };
+    for (const pl of (room && room.planes) || []) {
+      const P = pl.p;
+      if (P.length < 3) continue;
+      let nx = 0, ny = 0, nz = 0;                                       // (Newell: the polygon's normal, whatever its shape)
+      for (let i = 0, j = P.length - 1; i < P.length; j = i++) { nx += (P[j][1] - P[i][1]) * (P[j][2] + P[i][2]); ny += (P[j][2] - P[i][2]) * (P[j][0] + P[i][0]); nz += (P[j][0] - P[i][0]) * (P[j][1] + P[i][1]); }
+      const dn = nx * dir[0] + ny * dir[1] + nz * dir[2];
+      if (Math.abs(dn) < 1e-9) continue;
+      const t = (nx * (P[0][0] - from[0]) + ny * (P[0][1] - from[1]) + nz * (P[0][2] - from[2])) / dn;
+      if (!(t > 1e-4 && t <= max)) continue;
+      const q = [from[0] + dir[0] * t, from[1] + dir[1] * t, from[2] + dir[2] * t];
+      const ax = Math.abs(nx), ay = Math.abs(ny), az = Math.abs(nz), [i0, i1] = az >= ax && az >= ay ? [0, 1] : ax >= ay ? [1, 2] : [0, 2];
+      if (inside(P.map((v) => [v[i0], v[i1]]), q[i0], q[i1])) take(t, kind(pl), pl.l);
+    }
+    if (dir[2] < -1e-6) take(-from[2] / dir[2], 'floor', 'floor');
+    return best;
+  }
   const walls = (room) => (room ? prep(room).walls : []);
   const surfaces = (room) => (room ? prep(room).tops : []);
   const blocks = (room) => (room ? prep(room).blocks : []);
 
-  M.room = { Room, ACTIONS, fromXR, mapRoom, kind, support, ceiling, pushOut, walls, surfaces, blocks, TABLE_T, SOLID_MIN };
+  M.room = { Room, ACTIONS, fromXR, mapRoom, kind, support, ceiling, pushOut, cast, walls, surfaces, blocks, TABLE_T, SOLID_MIN };
 })(typeof module !== 'undefined' ? (module.exports = require('./ns.js')) : (globalThis.MUMR = globalThis.MUMR || {}));

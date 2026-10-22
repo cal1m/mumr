@@ -4,7 +4,10 @@
 //     touching) that starts within 3 cm of it, or a fist that closes with its middle within 8 cm of it. The hold is a spring: the cube follows the hand
 //     but is stopped by whatever is in the way, and a hand that pulls more than 30 cm away (through a wall) lets go. It falls when let
 //     go, slides and slows on the floor; with a room (cube.room: room.js, this page's floor plan) it rests on tables and on solid
-//     objects, passes under tables, stops at walls and objects, and never goes through anything: it moves in 1 cm steps;
+//     objects, passes under tables, stops at walls and objects, and never goes through anything: it moves in 1 cm steps. It can be
+//     put on a flat hand (palm up or back of the hand up, grab.js platform) and is carried by it until the hand tilts or it is off its
+//     edge. A pointing finger pushes it like any other (Marek, 2026-10-23: one finger stopped pushing it). Feet push it only with
+//     cfg.kick (off here);
 //   * its BODY adapter (MUMR body.js): the token 'cube' follows touch, the holder sends packet 16;
 //   * the MENU: the app's own (the engine's menu, with Line up, Room setup and Exit, is on the wrist: client/sysmenu.js); the same layout
 //     for this player's menu, another player's menu, and the PC view.
@@ -14,7 +17,7 @@
   const SIZE = 0.12, HALF = SIZE / 2;
   const COLOURS = ['#e8a33d', '#4ea1ff', '#7bd88f', '#ff6b81', '#c792ea'];
   const DEF = { gravity: 9.81, friction: 3.0, touch: 0.012, grab: 0.03, grabFist: 0.08, spring: 20, holdSpeed: 5, breakAway: 0.3,
-    smooth: 12, snap: 0.25, reach: 0.06, busy: 0.02, tip: 2.5, closeNear: 0.05 };
+    smooth: 12, snap: 0.25, reach: 0.06, busy: 0.02, tip: 2.5, closeNear: 0.05, kick: false, footTouch: 0.045 };
   const R = HALF * 1.3;          // the cube against walls and objects: a round thing a little wider than its half (its corners are at 1.41)
   const STEP = 0.01;             // m, the longest single move (shorter than R: nothing can be passed in one step)
 
@@ -25,11 +28,12 @@
     blend: (a, b, f) => a.map((v, i) => (i === 3 ? v + Math.atan2(Math.sin(b[3] - v), Math.cos(b[3] - v)) * f : i === 7 ? a[7] : v + (b[i] - v) * f)) });
 
   const pt = (s, name) => (s.points || []).find((p) => p.name === name);
-  // a hand that is closing on the cube: the thumb and index coming together, or the fingers curling, near it (it is about to grip)
+  // a hand that is closing on the cube: the thumb and index coming together, or the fingers curling, near it (it is about to grip).
+  // Not a pointing hand: its other fingers are curled too, but it pushes with its index (that stopped one-finger pushing, 2026-10-23).
   function closingOn(cube, s, C) {
-    if (cube.nearest([s]) > C.closeNear) return false;
+    if (cube.nearest([s]) > C.closeNear || cube.grips.of(s.id).gesture === 'point') return false;
     const th = pt(s, 'thumb'), ix = pt(s, 'index');
-    return (th && ix && Math.hypot(th.x - ix.x, th.y - ix.y, th.z - ix.z) < 0.06) || M.grab.closing(s) > 0.5;
+    return (th && ix && Math.hypot(th.x - ix.x, th.y - ix.y, th.z - ix.z) < 0.05) || M.grab.closing(s) > 0.6;
   }
 
   class Cube {
@@ -43,6 +47,7 @@
       this.touched = false;
       this.room = null;                     // the room (room.js local()), or null: the floor only
       this.ground = HALF;                   // the height of its middle when it rests where it is
+      this.onHand = null;                   // { id, q (its platform) } while it rests on a flat hand
     }
     // a point in the cube's own frame (its middle, turned with it)
     local(x, y, z) { const c = Math.cos(this.yaw), s = Math.sin(this.yaw), dx = x - this.x, dy = y - this.y; return [c * dx + s * dy, -s * dx + c * dy, z - this.z]; }
@@ -89,6 +94,29 @@
       }
       return out;
     }
+    // The flat hand it rests on, or is coming down onto (Nudgy's palm platform): a hand held flat under it, palm up or back up, not
+    // gripping. It is carried: it goes where the hand goes and turns with it, until the hand tilts past PLAT.maxTilt or it is off the
+    // hand's edge. -> { id, q, z (the hand's top under it), x, y, yaw (where the hand takes it) } or null
+    _hand(grips) {
+      const prev = this.onHand, bottom = this.z - HALF, P = M.grab.PLAT;
+      let best = null;
+      for (const g of grips) {
+        const q = g.palm;
+        if (!q || g.kind) continue;                                       // (a hand that grips is no place to stand)
+        const was = !!prev && prev.id === g.id;
+        let x = this.x, y = this.y, yaw = this.yaw;
+        if (was) {
+          const p = prev.q, da = M.util.wrap(q.ang - p.ang), c = Math.cos(da), sn = Math.sin(da), rx = this.x - p.cx, ry = this.y - p.cy;
+          x = q.cx + c * rx - sn * ry; y = q.cy + sn * rx + c * ry; yaw += da;
+        }
+        if (!M.grab.onPlatform(q, x, y, was ? 0.015 : 0) || q.tilt > (was ? P.maxTilt : P.onTilt)) continue;
+        const z = M.grab.platZ(q, x, y);
+        if (!was && (z > bottom + 0.03 || z < bottom - Math.max(0.02, -this.vz * 0.05))) continue;    // (it comes onto a hand from just above)
+        if (!best || z > best.z) best = { id: g.id, q, z, x, y, yaw };
+      }
+      this.onHand = best ? { id: best.id, q: best.q } : null;
+      return best;
+    }
     // one step of dt seconds at time t (s) with every hand there is (this page's and the others', floor plan)
     step(dt, t, sources) {
       const C = this.cfg, grips = this.grips.update(sources);
@@ -102,6 +130,7 @@
         }
       }
       if (this.held && !grips.some((g) => g.id === this.held.by)) this.held = null;            // the hand was lost: it falls
+      if (this.held) this.onHand = null;
       if (this.held) {
         // the hold is a spring: the cube goes towards where the hand wants it, at most holdSpeed, and stops at whatever is in the way
         const g = grips.find((q) => q.id === this.held.by), o = this.held.off;
@@ -118,10 +147,10 @@
         // pushing: every point and joint of every hand that is in the cube moves it out, with the hand's speed; not a hand that is
         // closing on it (about to grip) or that touches it from two sides at once (it is holding it, not pushing it)
         for (const s of sources || []) {
-          if (s.foot || closingOn(this, s, C)) continue;
+          if ((s.foot && !C.kick) || closingOn(this, s, C) || (this.onHand && this.onHand.id === s.id)) continue;      // (not the hand it rests on)
           const pts = (s.points || []).map((p) => [p.x, p.y, p.z]).concat(s.joints || []), pushes = [];
           pts.forEach((p, i) => {
-            const v = this._vel(`${s.id}:${i}`, p, t), l = this.local(p[0], p[1], p[2]), r = C.touch;
+            const v = this._vel(`${s.id}:${i}`, p, t), l = this.local(p[0], p[1], p[2]), r = s.foot ? C.footTouch : C.touch;
             const px = HALF + r - Math.abs(l[0]), py = HALF + r - Math.abs(l[1]), pz = HALF + r - Math.abs(l[2]);
             if (px <= 0 || py <= 0 || pz <= 0) return;
             if (pz < Math.min(px, py) && l[2] > 0) return;                    // (from above: it is not pressed into the floor)
@@ -140,31 +169,41 @@
             this.wz += (q.l[0] * q.ay - q.l[1] * q.ax) * Math.max(0, along) * 6;    // off the middle, it turns
           }
         }
-        // free: it falls onto what carries it, tips off an edge it hangs over, slides to a stop, and stops at walls and objects
-        const G = this._ground(this.x, this.y, this.z - HALF), g = HALF + G.h, resting = this.z <= g + 1e-4 && this.vz <= 0;
-        if (!resting) this.vz -= C.gravity * dt;
-        else if (G.mid < G.h - 0.01) {                                       // (its middle hangs over a lower place: it slides off that way)
-          const ol = Math.hypot(G.off[0], G.off[1]);
-          if (ol > HALF * 0.15) { this.vx -= (G.off[0] / ol) * C.tip * dt; this.vy -= (G.off[1] / ol) * C.tip * dt; }
-        }
-        this.yaw = M.util.wrap(this.yaw + this.wz * dt);
-        const hit = this._move(this.vx * dt, this.vy * dt, resting ? 0 : this.vz * dt);
-        if (hit.landed && this.vz < 0) this.vz = this.vz < -0.8 ? -this.vz * 0.2 : 0;
-        if (hit.ceiling && this.vz > 0) this.vz = 0;
-        if (hit.hitWall) { const [nx, ny] = hit.hitWall, into = this.vx * nx + this.vy * ny; if (into < 0) { this.vx -= 1.3 * into * nx; this.vy -= 1.3 * into * ny; } }
-        this.ground = HALF + this._ground(this.x, this.y, this.z - HALF).h;
-        if (this.z <= this.ground + 1e-4 && this.vz <= 0) {
-          const k = Math.exp(-C.friction * dt); this.vx *= k; this.vy *= k; this.wz *= k;
-          if (Math.hypot(this.vx, this.vy) < 0.003) { this.vx = 0; this.vy = 0; }
-          if (Math.abs(this.wz) < 0.01) this.wz = 0;
+        // on a flat hand: carried (still against the room: what is in the way stops it, and the hand may then leave it behind)
+        const H = this._hand(grips);
+        if (H) {
+          const x0 = this.x, y0 = this.y, z0 = this.z;
+          this.yaw = H.yaw;
+          this._move(H.x - this.x, H.y - this.y, H.z + HALF - this.z);
+          if (dt > 0) { this.vx = (this.x - x0) / dt; this.vy = (this.y - y0) / dt; this.vz = (this.z - z0) / dt; }
+          this.wz = 0; this.touched = true; this.ground = this.z;
+        } else {
+          // free: it falls onto what carries it, tips off an edge it hangs over, slides to a stop, and stops at walls and objects
+          const G = this._ground(this.x, this.y, this.z - HALF), g = HALF + G.h, resting = this.z <= g + 1e-4 && this.vz <= 0;
+          if (!resting) this.vz -= C.gravity * dt;
+          else if (G.mid < G.h - 0.01) {                                       // (its middle hangs over a lower place: it slides off that way)
+            const ol = Math.hypot(G.off[0], G.off[1]);
+            if (ol > HALF * 0.15) { this.vx -= (G.off[0] / ol) * C.tip * dt; this.vy -= (G.off[1] / ol) * C.tip * dt; }
+          }
+          this.yaw = M.util.wrap(this.yaw + this.wz * dt);
+          const hit = this._move(this.vx * dt, this.vy * dt, resting ? 0 : this.vz * dt);
+          if (hit.landed && this.vz < 0) this.vz = this.vz < -0.8 ? -this.vz * 0.2 : 0;
+          if (hit.ceiling && this.vz > 0) this.vz = 0;
+          if (hit.hitWall) { const [nx, ny] = hit.hitWall, into = this.vx * nx + this.vy * ny; if (into < 0) { this.vx -= 1.3 * into * nx; this.vy -= 1.3 * into * ny; } }
+          this.ground = HALF + this._ground(this.x, this.y, this.z - HALF).h;
+          if (this.z <= this.ground + 1e-4 && this.vz <= 0) {
+            const k = Math.exp(-C.friction * dt); this.vx *= k; this.vy *= k; this.wz *= k;
+            if (Math.hypot(this.vx, this.vy) < 0.003) { this.vx = 0; this.vy = 0; }
+            if (Math.abs(this.wz) < 0.01) this.wz = 0;
+          }
         }
       }
       if (Math.hypot(this.x, this.y) > 8) this.place(0.5, 0);             // (it went too far: back near the middle)
       const k = Math.exp(-C.smooth * dt);
       this.off.x *= k; this.off.y *= k; this.off.z *= k; this.off.yaw *= k;
     }
-    place(x, y) { this.x = x; this.y = y; this.z = HALF; this.vx = this.vy = this.vz = this.wz = 0; this.held = null; }
-    moving() { return !!this.held || Math.hypot(this.vx, this.vy, this.vz) > 0.002 || Math.abs(this.wz) > 0.01 || this.z > this.ground + 1e-3; }
+    place(x, y) { this.x = x; this.y = y; this.z = HALF; this.vx = this.vy = this.vz = this.wz = 0; this.held = null; this.onHand = null; }
+    moving() { return !!this.held || !!this.onHand || Math.hypot(this.vx, this.vy, this.vz) > 0.002 || Math.abs(this.wz) > 0.01 || this.z > this.ground + 1e-3; }
     drawn() { return { x: this.x + this.off.x, y: this.y + this.off.y, z: this.z + this.off.z, yaw: this.yaw + this.off.yaw, held: !!this.held }; }
   }
 

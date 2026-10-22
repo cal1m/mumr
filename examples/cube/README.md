@@ -1,8 +1,10 @@
 # The MUMR cube
 
-One 12 cm cube on the floor that every player can push with bare hands and pick up (a pinch: index and thumb touching each other, that
-starts at the cube; it holds while they touch), a menu that every player can press and its owner can carry by the handle under it,
-everybody's hands, heads and legs (from body tracking, or estimated from the head), lining up on the printed crosses, and a PC view.
+One 12 cm cube that every player can push with bare hands (one finger is enough), pick up (a pinch or a fist that starts at the cube;
+it holds while the grip lasts, on a spring that stops at walls and objects), put on a flat hand (palm up or back up) and point at (a ray
+to whatever a pointing finger points at: the cube or a part of the room); it rests on tables and solid objects in the room. A menu that
+every player can press and its owner can carry by the handle under it, everybody's hands and heads (no feet here), the hand cutouts,
+the hand window on the room's longest wall, lining up on the printed crosses, and a PC view.
 Built on 2026-10-22; run once on one Quest Pro the same day (five faults found and fixed); not yet on two headsets.
 
 ## On two headsets

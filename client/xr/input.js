@@ -24,24 +24,20 @@ function readJoints(frame, hand, ref, out) {
   return true;
 }
 
-// The legs from body tracking (frame.body, Meta's joint names; Nudgy read left-foot-ankle and left-foot-ball on a Quest Pro): two sources
-// marked foot, to draw only. [] when the browser gives no body.
-const LEG_JOINTS = { hip: 'upper-leg', knee: 'lower-leg', ankle: 'foot-ankle', toe: 'foot-ball' };
-export function readLegs(xr, frame, space) {
+// The feet from body tracking (frame.body, Meta's joint names: left-foot-ankle, left-foot-ball, as Nudgy read them on a Quest Pro): a shoe
+// source for each foot that has both joints (hands.js shoe). [] when the browser gives no body.
+export function readFeet(xr, frame, space) {
   const body = frame && frame.body, out = [];
   if (!body || !body.get) return out;
   try {
     for (const side of ['left', 'right']) {
-      const points = [];
-      for (const [name, joint] of Object.entries(LEG_JOINTS)) {
-        const sp = body.get(`${side}-${joint}`), p = sp && frame.getPose(sp, xr.refSpace);
-        if (!p) break;
-        const q = p.transform.position;
-        points.push({ name, x: q.x, y: -q.z, z: q.y - space.floorY });
-      }
-      if (points.length === 4) out.push({ id: `${side}-foot`, foot: true, noHold: true, points });
+      const a = body.get(`${side}-foot-ankle`), b = body.get(`${side}-foot-ball`);
+      const pa = a && frame.getPose(a, xr.refSpace), pb = b && frame.getPose(b, xr.refSpace);
+      if (!pa || !pb) continue;
+      const P = (p) => [p.transform.position.x, -p.transform.position.z, p.transform.position.y - space.floorY];
+      out.push(M().hands.shoe(side, P(pa), P(pb)));
     }
-  } catch (e) { /* a browser whose body has other joints: no legs, nothing else breaks */ }
+  } catch (e) { /* a browser whose body has other joints: no feet, nothing else breaks */ }
   return out;
 }
 
