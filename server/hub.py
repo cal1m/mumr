@@ -1,8 +1,11 @@
 """The MUMR hub: who is in the shared world, in what order things happened, and who simulates what. No sockets here:
 every connection is two callables that send it a text message (a dict) or a binary one. Nothing here knows the app.
 
-Two roles join (the first message, {t:'join', build, name, role}):
+Three roles join (the first message, {t:'join', build, name, role}):
     player   (default) a headset: takes a slot (0 to max_peers - 1), gets events, tokens and everybody's motion
+    host     at most one: a process on the PC (client/host.js) that holds the bodies nobody touches, in slot HOST. It is not counted as a
+             player (hello and 'peer' mark it host: true), it has no hands and no place to keep. Bodies go to it first: when their holder
+             lets go of them (release), leaves or goes silent. A touch still takes a body from it at once (claim).
     viewer   a watcher (a PC page that shows the whole world): an id from VIEWER_BASE, not a player (no slot, not listed to the
              players, no tokens). It gets every event, token change and motion packet. It may only make OWNED things (below).
 
@@ -61,6 +64,7 @@ MAX_KEPT = 2_000_000  # bytes (as JSON) of one kept event, at most
 MAX_OWNED = 16        # owned things per connection
 OWN_RATE = 20         # changes of owned things a connection may make in a second
 MAX_TOKENS = 512
+HOST = 15             # the host's slot (players are 0 to max_peers - 1)
 RESUME_HOLD = 10.0    # s: how long a player whose connection went keeps its place
 RELEASE_HOLD = 5.0    # s: a page that gave a body up is not handed it again for this long
 SILENT = 2.5          # s: a holder that said nothing for this long (pings come 4 times a second) loses its tokens. Not 1 s: a page
@@ -181,10 +185,14 @@ class Hub:
         p = self._who(who)
         return p is not None and (conn is None or p.get("conn") is None or p["conn"] is conn)
 
-    def _earliest(self, alive_since=None):
+    def _earliest(self, alive_since=None, but=None):
+        """Who a body goes to: the host when it is here (and alive), otherwise the player who came first."""
+        h = self.peers.get(HOST)
+        if h is not None and HOST != but and (alive_since is None or h["last"] >= alive_since):
+            return HOST
         best = None
         for slot, p in self.peers.items():
-            if alive_since is not None and p["last"] < alive_since:
+            if slot == HOST or slot == but or (alive_since is not None and p["last"] < alive_since):
                 continue
             if best is None or p["order"] < self.peers[best]["order"]:
                 best = slot
@@ -200,11 +208,11 @@ class Hub:
 
     def label(self, who):
         """For the server's log lines."""
-        return "viewer %d" % (who - VIEWER_BASE + 1) if who >= VIEWER_BASE else "player %d" % (who + 1)
+        return "viewer %d" % (who - VIEWER_BASE + 1) if who >= VIEWER_BASE else "the host" if who == HOST else "player %d" % (who + 1)
 
     def _hello_common(self):
         everyone = sorted(list(self.peers.items()) + list(self.parked.items()))
-        return {"peers": [{"slot": s, "name": p["name"]} for s, p in everyone], "tokens": dict(self.tokens), "n": self.n,
+        return {"peers": [dict({"slot": s, "name": p["name"]}, **({"host": True} if s == HOST else {})) for s, p in everyone], "tokens": dict(self.tokens), "n": self.n,
                 "doc": [{"from": d["from"], "e": d["e"]} for d in self.doc.values()], "clocks": {str(s): o for s, o in self.clock_off.items()},
                 "viewers": len(self.viewers)}
 
@@ -299,15 +307,17 @@ class Hub:
                 same = False
             role = msg.get("role", "player")
             why = None if same else "version"
-            if why is None and role not in ("player", "viewer"):
+            if why is None and role not in ("player", "viewer", "host"):
                 why = "role"
+            if why is None and role == "host" and HOST in self.peers:
+                why = "full"
             res = msg.get("resume") if role == "player" else None
             back = None
             if isinstance(res, dict) and isinstance(res.get("slot"), int) and isinstance(res.get("key"), str):
                 q = self.parked.get(res["slot"]) or self.peers.get(res["slot"])
                 if q is not None and q.get("key") == res["key"]:
                     back = res["slot"]
-            if why is None and role == "player" and back is None and len(self.peers) + len(self.parked) >= self.max_peers:
+            if why is None and role == "player" and back is None and len([q for q in self.peers if q != HOST]) + len(self.parked) >= self.max_peers:
                 why = "full"
             if why is None and role == "viewer" and len(self.viewers) >= MAX_VIEWERS:
                 why = "full"
@@ -323,6 +333,19 @@ class Hub:
                 who = next(VIEWER_BASE + i for i in range(MAX_VIEWERS) if VIEWER_BASE + i not in self.viewers)
                 self.viewers[who] = {"text": send_text, "bin": send_bin, "name": name or "viewer", "last": self.now(), "conn": conn, "kill": kill}
                 self._text(who, dict(self._hello_common(), t="hello", role="viewer", slot=who), dead)
+            elif role == "host":
+                who = HOST
+                self.peers[who] = {"text": send_text, "bin": send_bin, "name": name or "host", "order": 0, "last": self.now(), "conn": conn, "kill": kill,
+                                   "key": None, "host": True}
+                given = [body for body in self.bodies if self.tokens[body] is None]
+                for body in given:
+                    self.tokens[body] = who
+                    self.busy[body] = False
+                self._text(who, dict(self._hello_common(), t="hello", role="host", slot=who), dead)
+                self._all({"t": "peer", "slot": who, "name": self.peers[who]["name"], "on": True, "host": True}, dead, but=who)
+                for body in given:
+                    self._all({"t": "token", "body": body, "slot": who}, dead, but=who)
+                self.log("ws", "the host joined; it holds %s" % (", ".join(b for b, s in self.tokens.items() if s == HOST) or "nothing yet"))
             elif back is not None:
                 who = back
                 old = self.peers.pop(who, None) or self.parked.pop(who)
@@ -389,8 +412,8 @@ class Hub:
                 return
             for body in list(self.tokens):                  # (nothing waits for it: its tokens go at once)
                 if self.tokens[body] == who:
-                    self._give(body, self._earliest() if body in self.bodies else None, dead)
-            if self.resume_hold > 0 and not p.get("bye"):
+                    self._give(body, self._earliest(but=who) if body in self.bodies else None, dead)
+            if self.resume_hold > 0 and not p.get("bye") and who != HOST:
                 self.parked[who] = {"name": p["name"], "order": p["order"], "key": p.get("key"), "at": self.now()}
                 self.log("ws", "%s: its place is kept for %.0f s (it may come back)" % (self.label(who), self.resume_hold))
             else:
@@ -400,7 +423,7 @@ class Hub:
     def _gone(self, who, name, dead):
         """A player is gone for good: what was its own goes, and everyone is told."""
         self._forget(who, dead)
-        self._all({"t": "peer", "slot": who, "name": name, "on": False}, dead)
+        self._all(dict({"t": "peer", "slot": who, "name": name, "on": False}, **({"host": True} if who == HOST else {})), dead)
 
     # ---- what a connection says
     def text(self, who, msg, conn=None):
@@ -446,7 +469,7 @@ class Hub:
                         gave = self._released.setdefault(body, {})
                         gave[who] = now
                         heirs = [s for s in self.peers if s != who and now - gave.get(s, -1e9) > RELEASE_HOLD]
-                        heir = min(heirs, key=lambda s: self.peers[s]["order"], default=None)
+                        heir = HOST if HOST in heirs else min(heirs, key=lambda s: self.peers[s]["order"], default=None)
                         if heir is not None:
                             self._give(body, heir, dead)
             elif t == "bye":
@@ -495,7 +518,7 @@ class Hub:
             for body, holder in list(self.tokens.items()):
                 if holder is None or holder not in self.peers or now - self.peers[holder]["last"] <= self.silent:
                     continue
-                heir = self._earliest(alive_since=now - self.silent)
+                heir = self._earliest(alive_since=now - self.silent, but=holder)
                 if heir is None or heir == holder:
                     continue
                 self._give(body, heir if body in self.bodies else None, dead)

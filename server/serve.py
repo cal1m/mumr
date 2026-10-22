@@ -1,6 +1,6 @@
 """The MUMR server: an app's pages over https on the local network, the engine's client scripts, and the hub's WebSocket.
 
-    py -3 server/serve.py APP_FOLDER [port] [--http] [--no-browser] [--log=PATH|none]          default port 8443
+    py -3 server/serve.py APP_FOLDER [port] [--http] [--no-browser] [--no-host] [--log=PATH|none]          default port 8443
 
 WebXR only runs on https (or localhost), so the headsets need a certificate: a self-signed one is made with openssl on the first
 run (and again when the PC's address changes) and kept in ~/.mumr/cert/ (never in a repository). Each browser warns about it once
@@ -11,13 +11,15 @@ What is served (read-only, no directory listings, no dot-files, no .py/.pem/.bat
     /...            the app's folder; / goes to the app's index page
     GET  /ws        the hub (hub.py): every headset and every PC viewer holds one WebSocket
     POST /log       a page's life lines (client/life.js) into the server log
-    GET  /info      {"build": n, "players": k, "viewers": v}
+    GET  /info      {"build": n, "players": k, "viewers": v, "host": bool}
 
 The build stamp is the newest .js/.html in the app's folder and the engine's client folder: a page of another build is refused
 when it joins, and pages can reload themselves when /info says the build changed.
 
 An app configures the server with `mumr.json` in its folder (all optional):
-    {"title": "Cube", "index": "index.html", "bodies": ["cube"], "owned": {"16": "cube"}, "max_peers": 4}
+    {"title": "Cube", "index": "index.html", "bodies": ["cube"], "owned": {"16": "cube"}, "max_peers": 4, "host": "host.js"}
+`host` names the app's host module: the server then runs `node client/host.js` with it (a process that holds the bodies nobody touches,
+client/host.js), starts it again when it ends (a new build of the pages ends it), and writes what it says into the log. --no-host: not.
 or calls run() from its own start script, which may also add routes: run(app, routes={"GET /networks.json": fn}) where
 fn(handler, path) answers with handler.send_json(obj) or handler.send_error(code).
 
@@ -222,7 +224,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
         elif path == "/info":
             h = self.server.hub
-            self.send_json({"build": self.server.build(), "players": len(h.peers), "viewers": len(h.viewers)})
+            self.send_json({"build": self.server.build(), "players": len([q for q in h.peers if q != hub_mod.HOST]), "viewers": len(h.viewers), "host": hub_mod.HOST in h.peers})
         elif self._route("GET"):
             pass
         elif self._refused():
@@ -393,6 +395,8 @@ def make_server(app, port=8443, plain=False, log=None, routes=None, config=None,
     httpd = Server((host or ("127.0.0.1" if plain else "0.0.0.0"), port), Handler)
     httpd.app, httpd.index, httpd.slog, httpd.build = app, cfg.get("index", "index.html"), slog, build
     httpd.title = cfg.get("title", os.path.basename(app))
+    httpd.host_module = os.path.join(app, cfg["host"]) if cfg.get("host") else None
+    httpd.plain = plain
     httpd.routes = dict(routes or {})
     httpd.hub = hub_mod.Hub(build, max_peers=int(cfg.get("max_peers", 4)), bodies=tuple(cfg.get("bodies", ())),
                             owned={int(k): v for k, v in cfg.get("owned", {}).items()}, log=slog)
@@ -409,7 +413,46 @@ def make_server(app, port=8443, plain=False, log=None, routes=None, config=None,
     return httpd
 
 
-def run(app, port=8443, plain=False, browser=True, log=None, routes=None, config=None):
+def find_node():
+    exe = shutil.which("node")
+    if exe:
+        return exe
+    for p in (r"C:\Program Files\nodejs\node.exe", r"C:\Program Files (x86)\nodejs\node.exe"):
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def keep_host(httpd, port):
+    """Run the app's host (client/host.js) for as long as the server runs, and start it again when it ends."""
+    node, slog = find_node(), httpd.slog
+    if not node:
+        slog("host", "node was not found: no host (install Node.js, or put node on the PATH)")
+        return
+    url = "%s://127.0.0.1:%d/ws" % ("ws" if httpd.plain else "wss", port)
+    env = dict(os.environ, NODE_TLS_REJECT_UNAUTHORIZED="0")       # (our own certificate, on this PC)
+
+    def loop():
+        while True:
+            started = time.monotonic()
+            try:
+                proc = subprocess.Popen([node, os.path.join(CLIENT, "host.js"), url, httpd.host_module], env=env, cwd=os.path.dirname(CLIENT),
+                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+            except OSError as e:
+                slog("host", "could not start: %s" % e)
+                return
+            httpd.host_proc = proc
+            for line in proc.stdout:
+                line = line.rstrip()
+                if line:
+                    sys.stderr.write("  host  %s\n" % line)
+            code = proc.wait()
+            slog("host", "ended (code %s) after %.0f s; starting it again" % (code, time.monotonic() - started))
+            time.sleep(2.0 if time.monotonic() - started > 10 else 5.0)
+    threading.Thread(target=loop, daemon=True).start()
+
+
+def run(app, port=8443, plain=False, browser=True, log=None, routes=None, config=None, host=True):
     httpd = make_server(app, port, plain, log, routes, config)
     ip, scheme = lan_ip(), "http" if plain else "https"
     page = httpd.index
@@ -426,11 +469,18 @@ def run(app, port=8443, plain=False, browser=True, log=None, routes=None, config
         threading.Timer(1.0, webbrowser.open, args=(f"{scheme}://localhost:{port}/{page}",)).start()
     httpd.slog("server", "started on port %d (%s), address %s, app %s; this log: %s" % (port, scheme, ip, httpd.app, httpd.slog.path))
     print(f"  server log   {httpd.slog.path or 'none'}")
+    if host and httpd.host_module:
+        print(f"  host         {httpd.host_module} (holds what nobody touches)")
+        keep_host(httpd, port)
     print("Close this window or press Ctrl+C to stop.\n", flush=True)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
         pass
+    finally:
+        proc = getattr(httpd, "host_proc", None)
+        if proc and proc.poll() is None:
+            proc.kill()
 
 
 def main(argv=None):
@@ -442,7 +492,7 @@ def main(argv=None):
     for a in argv:
         if a.startswith("--log="):
             log = False if a[6:].lower() == "none" else os.path.abspath(a[6:])
-    run(args[0], int(args[1]) if len(args) > 1 else 8443, plain="--http" in argv, browser="--no-browser" not in argv, log=log)
+    run(args[0], int(args[1]) if len(args) > 1 else 8443, plain="--http" in argv, browser="--no-browser" not in argv, log=log, host="--no-host" not in argv)
 
 
 if __name__ == "__main__":

@@ -67,7 +67,7 @@ S.on('token', (t, mine) => { if (t === 'cube') life(`cube: ${mine ? 'simulated h
 // (also when the frame loop has stopped without the page saying it is hidden: a paused tab, a frozen page)
 setInterval(() => { if (performance.now() - last > 1000) away(); }, 500);
 let awayAt = -1e9;
-function away() { const now = performance.now(); if (now - awayAt < 5000 || !S.connected || !S.holds('cube') || !S.others) return; awayAt = now; S.release('cube'); life('cube: given up (this page is not looked at)'); }
+function away() { const now = performance.now(); if (now - awayAt < 5000 || !S.connected || !S.holds('cube') || !(S.others || S.hostHere)) return; awayAt = now; S.release('cube'); life('cube: given up (this page is not looked at)'); }
 S.on('leave', (why) => { if (why === 'version') say('This page is older than the server\'s: reload it'); });
 if (QS.has('frame')) {
   const [x, y, deg] = QS.get('frame').split(',').map(Number);

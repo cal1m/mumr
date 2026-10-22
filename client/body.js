@@ -29,7 +29,8 @@
       this.policy = opts.policy || 'touch'; this.owner = opts.owner === undefined ? null : opts.owner;
       this.every = opts.every || 21; this.slowEvery = opts.slowEvery === undefined ? 250 : opts.slowEvery;
       this.guard = new M.wire.Guard();
-      this._sentAt = -1e9; this._first = true; this._held = undefined;
+      this._sentAt = -1e9; this._first = true; this._held = undefined; this._restSince = null;
+      this.restMs = opts.restMs === undefined ? 600 : opts.restMs;      // ms at rest and untouched before a body goes back to the host
       this.stats = { claims: 0, grants: 0, handovers: 0, sent: 0, got: 0, applied: 0, old: 0, requests: 0 };
       const S = session;
       S.on('token', (t, mine) => { if (t === this.token) this._token(mine); });
@@ -41,7 +42,7 @@
     _ownerSlot() { return this.owner === 'me' ? this.session.me : this.owner; }
     _token(mine) {
       this.guard = new M.wire.Guard();          // (the one that sends now has a clock of its own)
-      this._first = true;
+      this._first = !(this._held === true && !mine);      // (it was ours a moment ago: our copy is in step, the new holder's state is a correction to glide to)
       if (this._held !== undefined && this._held !== mine) { this.stats.handovers++; if (mine) this.stats.grants++; }       // (the first word on it is not a handover)
       this._held = mine;
       if (this.a.settle) this.a.settle(mine);
@@ -59,7 +60,14 @@
       }
       if (!S.sharing()) { S.setBusy(this.token, false); return; }
       if (!S.holds(this.token) && this.a.reach(own)) { if (S.claim(this.token, nowMs)) this.stats.claims++; }
-      S.setBusy(this.token, S.holds(this.token) && !!this.a.touching(own));
+      const touching = S.holds(this.token) && !!this.a.touching(own);
+      S.setBusy(this.token, touching);
+      // With a host here, a body that nobody of ours touches and that has come to rest goes back to it (the host keeps it while nobody
+      // plays with it, also when every headset has gone)
+      if (S.hostHere && !S.isHost && S.holds(this.token) && !touching && !(this.a.moving && this.a.moving())) {
+        if (this._restSince === null) this._restSince = nowMs;
+        else if (nowMs - this._restSince >= this.restMs) { S.release(this.token); this.stats.returned = (this.stats.returned || 0) + 1; this._restSince = null; }
+      } else this._restSince = null;
     }
     // After the simulation stepped: the holder's state goes out when somebody can see it. Says whether a packet went.
     send(nowMs) {

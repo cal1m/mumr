@@ -15,11 +15,12 @@ class Hub {
   }
   _hello(id, role) {
     const players = [...this.links].filter(([s]) => s < 100 && s !== id);
-    return { t: 'hello', role, slot: id, peers: players.map(([s, o]) => ({ slot: s, name: o.name })), tokens: Object.assign({}, this.tokens), n: this.n,
+    return { t: 'hello', role, slot: id, peers: players.map(([s, o]) => (s === 15 ? { slot: s, name: o.name, host: true } : { slot: s, name: o.name })), tokens: Object.assign({}, this.tokens), n: this.n,
       doc: [...this.doc.values()].map((d) => ({ from: d.from, e: d.e })), clocks: Object.assign({}, this.clocks), viewers: [...this.links.keys()].filter((s) => s >= 100).length };
   }
   // a pretend link.js connection; role 'viewer' for a watcher
   link(name, role = 'player') {
+    if (role === 'host') return this._host(name);
     const hub = this, l = { slot: null, open: false, hello: null, name, role, sent: [], onOpen: null, onText: null, onBin: null, onClose: null, clockOffset: null,
       sendText(m) { if (!l.open) return false; hub.text(l.slot, JSON.parse(JSON.stringify(m))); return true; },
       sendBin(b) { if (!l.open) return false; hub.binary(l.slot, new Uint8Array(b)); return true; } };
@@ -34,6 +35,19 @@ class Hub {
     for (const [k, b] of this.latest) if (k % 256 !== id) this.queue.push([id, { bin: b }]);
     return l;
   }
+  // the host: slot 15, holds the bodies nobody holds, is listed with host: true
+  _host(name) {
+    const hub = this, id = 15, l = { slot: null, open: false, hello: null, name, role: 'host', onOpen: null, onText: null, onBin: null, onClose: null, clockOffset: null,
+      sendText(m) { if (!l.open) return false; hub.text(l.slot, JSON.parse(JSON.stringify(m))); return true; },
+      sendBin(b) { if (!l.open) return false; hub.binary(l.slot, new Uint8Array(b)); return true; } };
+    const given = this.bodies.filter((b) => this.tokens[b] === null);
+    for (const b of given) this.tokens[b] = id;
+    this.links.set(id, l);
+    this.queue.push([id, Object.assign(this._hello(id, 'host'))]);
+    for (const s of this.links.keys()) if (s !== id) { this.queue.push([s, { t: 'peer', slot: id, name, on: true, host: true }]); for (const b of given) this.queue.push([s, { t: 'token', body: b, slot: id }]); }
+    return l;
+  }
+  _heir(but) { if (this.links.has(15) && but !== 15) return 15; return [...this.links.keys()].filter((s) => s < 15 && s !== but).sort((x, y) => x - y)[0]; }
   all(m, but) { for (const s of this.links.keys()) if (s !== but) this.queue.push([s, m]); }
   give(body, slot) { this.tokens[body] = slot; this.busy[body] = false; this.all({ t: 'token', body, slot }); }
   event(who, e) {
@@ -65,7 +79,8 @@ class Hub {
       if (!this.bodies.includes(m.body)) this.give(m.body, null);
       else {
         const gave = (this.released[m.body] = this.released[m.body] || {}), now = Date.now(); gave[who] = now;
-        const heir = [...this.links.keys()].filter((s) => s < 100 && s !== who && !(now - (gave[s] || -1e9) <= 5000)).sort((x, y) => x - y)[0];
+        const ok = (s) => s < 100 && s !== who && !(now - (gave[s] || -1e9) <= 5000);
+        const heir = this.links.has(15) && ok(15) ? 15 : [...this.links.keys()].filter((s) => ok(s) && s !== 15).sort((x, y) => x - y)[0];
         if (heir !== undefined) this.give(m.body, heir);
       }
     }
@@ -88,9 +103,9 @@ class Hub {
     if (id < 100) {
       delete this.clocks[id];
       for (const k of [...this.latest.keys()]) if (k % 256 === id) this.latest.delete(k);
-      this.all({ t: 'peer', slot: id, name: l.name, on: false });
+      this.all(id === 15 ? { t: 'peer', slot: id, name: l.name, on: false, host: true } : { t: 'peer', slot: id, name: l.name, on: false });
       for (const b of Object.keys(this.tokens)) if (this.tokens[b] === id) {
-        const heir = this.bodies.includes(b) ? [...this.links.keys()].filter((s) => s < 100).sort((x, y) => x - y)[0] : undefined;
+        const heir = this.bodies.includes(b) ? this._heir(id) : undefined;
         this.give(b, heir === undefined ? null : heir);
       }
     } else for (const s of this.links.keys()) if (s < 100) this.queue.push([s, { t: 'viewers', n: [...this.links.keys()].filter((k) => k >= 100).length }]);

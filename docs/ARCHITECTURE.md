@@ -96,6 +96,14 @@ their first claim and fall to nobody when the holder leaves. A holder that says 
 tokens (a page that is not in front ticks once a second). `busy` (a hand is on it) blocks claims; the toucher never waits for the network:
 it simulates locally with everybody's hands from the frame it touches, and the holder's state corrects small differences afterwards.
 
+## 6a. The host
+
+An app may have a host (`mumr.json` `"host": "host.js"`): the server starts `node client/host.js` with the app's host module and starts
+it again when it ends. The host joins in slot 15 with role `host`: not a player (not counted, no hands, no menu, marked `host` in hello and
+`peer`), lined up by being the common frame. It runs the app's own plain simulation with everybody's hands. Bodies go to it first: when
+their holder releases them (a body at rest that nobody of that page touches is released after 0.6 s), leaves or goes silent. A touch
+still takes a body from it at once. So the world goes on, and stays where it was left, when every headset has gone.
+
 ## 6b. Coming back after a drop
 
 A player's hello carries a `key`. When its connection goes (a Wi-Fi stall: the page gives up after 4 s; a reload), the hub keeps its

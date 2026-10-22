@@ -43,4 +43,5 @@ steps it by hand. A pretend second player without a browser: `node tools/standin
 | `draw.js` | how the cube looks, for both pages |
 | `app.js`, `index.html` | the headset page (also the desktop rehearsal) |
 | `view.js`, `view.html` | the PC view (a WorldFeed watcher) |
-| `mumr.json` | the server's settings: the token `cube` always has a holder, packet 16 belongs to it |
+| `host.js` | the cube's host module: the server runs it on the PC (`client/host.js`), it holds the cube while nobody touches it |
+| `mumr.json` | the server's settings: the token `cube` always has a holder, packet 16 belongs to it, the host module |

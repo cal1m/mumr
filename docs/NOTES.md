@@ -173,3 +173,7 @@ Kept from the first plan's section 6, plus what came after it:
   and logs how late each stream arrives against its stamps (unproven cause; a headset clock estimate that is off is the suspect).
   From the log: both lined up (335 cm), the cube's token went back and forth 8 times while they played, body tracking was granted on
   both, the `shared` space was granted on both but never got a UUID, even with two headsets in the room. Faults: items 27 and 28.
+- **2026-10-22 (evening)** The rejoin (item 26) and then the host (PLAN 6), Marek's choice of order. The host: a hub role (slot 15,
+  not a player), `client/host.js` (Node: the app's own simulation with everybody's hands, in the common frame), the server starts
+  and restarts it, bodies go to it first and come back to it at rest. Rehearsed: a page pushed the cube 34 cm, it came to rest and
+  went back to the host, and a page opened later found it where it was left. 78 Node, 48 Python tests. Not yet on a headset.

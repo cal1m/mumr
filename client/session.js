@@ -133,7 +133,10 @@
     off(name, fn) { this.bus.off(name, fn); return this; }
     notify(name, ...a) { this.bus.emit(name, ...a); }
     get connected() { return this.me !== null; }
-    get others() { return this.peers.size; }
+    // the other players (the host is not one: it is in `peers`, marked host, so that lining up and sharing count it)
+    get others() { let n = 0; for (const p of this.peers.values()) if (!p.host) n++; return n; }
+    get hostHere() { for (const p of this.peers.values()) if (p.host) return true; return false; }
+    get isHost() { return this.role === 'host'; }
     get isViewer() { return this.role === 'viewer'; }
 
     // ---- reading it
@@ -234,7 +237,7 @@
       this.me = h.slot; this.n = h.n || 0; this.role = h.role || 'player'; this.viewers = h.viewers | 0;
       this.tokens = Object.assign({}, h.tokens);
       this.peers.clear();
-      for (const p of h.peers || []) this.peers.set(p.slot, { name: p.name, seen: -1e9, stale: true });
+      for (const p of h.peers || []) this.peers.set(p.slot, { name: p.name, seen: -1e9, stale: true, host: !!p.host });
       this.clocks.clear();
       for (const [k, v] of Object.entries(h.clocks || {})) if (U().num(v)) this.clocks.set(+k, v);
       this._busy = {};
@@ -285,7 +288,7 @@
       if (m.t === 'ev') { if (m.n > this.n) { this.n = m.n; this._apply(m.e, m.from); } }
       else if (m.t === 'viewers') { this.viewers = m.n | 0; this.notify('viewers', this.viewers); }
       else if (m.t === 'peer') {
-        if (m.on) this.peers.set(m.slot, { name: m.name, seen: -1e9, stale: true });
+        if (m.on) this.peers.set(m.slot, { name: m.name, seen: -1e9, stale: true, host: !!m.host });
         else this._gonePlayer(m.slot);
         this.notify('peer', m.slot, !!m.on);
       } else if (m.t === 'token') {

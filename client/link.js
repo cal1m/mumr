@@ -51,7 +51,7 @@
         if (m.t === 'hello') {
           link.slot = m.slot; link.open = true; link.hello = m; link.why = ''; tries = 0; link.resumed = !!m.resumed;
           if (m.role === 'player' && typeof m.key === 'string') { resume = { slot: m.slot, key: m.key }; setResume(resume); }
-          note(m.role === 'viewer' ? 'in, as a viewer' : `in, player ${m.slot + 1}${m.resumed ? ' (came back to its place)' : ''}`);
+          note(m.role === 'viewer' ? 'in, as a viewer' : m.role === 'host' ? 'in, as the host' : `in, player ${m.slot + 1}${m.resumed ? ' (came back to its place)' : ''}`);
           if (link.onOpen) link.onOpen(m);
         }
         else if (m.t === 'refused') { link.why = String(m.why || 'refused'); closed = true; resume = null; setResume(null); note(`refused: ${link.why}`); }       // another version, or full: coming back would not help

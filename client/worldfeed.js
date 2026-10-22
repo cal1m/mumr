@@ -102,6 +102,7 @@
     players() {
       const S = this.session, out = [];
       for (const [slot, p] of [...S.peers].sort((a, b) => a[0] - b[0])) {
+        if (p.host) continue;                       // (the host is not a player)
         out.push({ slot, name: p.name, lined: S.doc.lined[slot] || null, check: S.doc.checks[slot] || null, state: S.stateOf(slot) });
       }
       return out;

@@ -383,6 +383,40 @@ class ResumeTest(unittest.TestCase):
         self.assertEqual(self.a.of("peer")[-1]["on"], False)
 
 
+class HostTest(unittest.TestCase):
+    def test_the_host_is_not_a_player_holds_what_nobody_holds_and_gets_bodies_first(self):
+        h, clock, (a, b) = make(bodies=("cube",))
+        self.assertEqual(h.tokens["cube"], 0)
+        host = join(h, "host", role="host")
+        self.assertEqual((host.id, host.of("hello")[0]["role"]), (hub.HOST, "host"))
+        self.assertEqual(a.of("peer")[-1], {"t": "peer", "slot": hub.HOST, "name": "host", "on": True, "host": True})
+        self.assertEqual(h.tokens["cube"], 0, "it does not take what a player holds")
+        h.text(0, {"t": "release", "body": "cube"})
+        self.assertEqual(h.tokens["cube"], hub.HOST, "a released body goes to the host first")
+        h.text(1, {"t": "claim", "body": "cube"})
+        self.assertEqual(h.tokens["cube"], 1, "a touch takes it from the host at once")
+        h.leave(1)
+        self.assertEqual(h.tokens["cube"], hub.HOST, "a holder that leaves: to the host")
+        self.assertEqual(join(h, "host 2", role="host").texts, [{"t": "refused", "why": "full"}], "one host")
+        c, d, e = join(h, "c"), join(h, "d"), join(h, "e")
+        self.assertEqual([c.id, d.id, e.id], [1, 2, 3], "the host takes no player's place")
+        self.assertIn({"slot": hub.HOST, "name": "host", "host": True}, e.of("hello")[0]["peers"])
+
+    def test_the_host_leaves_and_its_bodies_go_to_the_earliest_player(self):
+        h, clock, (a, b) = make(bodies=("cube",))
+        join(h, "host", role="host")
+        h.text(0, {"t": "release", "body": "cube"})
+        h.leave(hub.HOST)
+        self.assertEqual(h.tokens["cube"], 0)
+        self.assertEqual(a.of("peer")[-1], {"t": "peer", "slot": hub.HOST, "name": "host", "on": False, "host": True})
+
+    def test_a_host_alone_holds_the_bodies_for_whoever_comes(self):
+        h = hub.Hub(lambda: BUILD, Clock(), bodies=("cube",), resume_hold=0)
+        join(h, "host", role="host")
+        p = join(h, "late")
+        self.assertEqual((h.tokens["cube"], p.of("hello")[0]["tokens"]), (hub.HOST, {"cube": hub.HOST}))
+
+
 class OutboxTest(unittest.TestCase):
     def test_messages_first_and_only_the_newest_motion_of_each_kind_and_sender(self):
         o = hub.Outbox()
