@@ -40,7 +40,7 @@ function playerObj(slot) {
   const check = new THREE.Mesh(new THREE.RingGeometry(0.045, 0.06, 32), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide }));
   check.rotation.x = -Math.PI / 2;
   world.add(headM, dots, check);
-  o = { headM, dots, check, panel: null, legs: makeLegs(THREE, world, col), key: '' };
+  o = { headM, dots, check, panels: {}, legs: makeLegs(THREE, world, col) };
   drawn.set(slot, o);
   return o;
 }
@@ -69,19 +69,24 @@ function frame() {
     o.legs.update(pr ? M.hands.legs(pr.data.head, pr.data.sources) : []);
     o.check.visible = !!p.check;
     if (p.check) o.check.position.copy(toV(p.check[0], p.check[1], (p.check[2] || 0) + 0.003));
-    // that player's menu, where it floats, drawn from its own state and mode (the same layout the headsets draw)
-    const m = feed.sample('menus', p.slot);
-    const row = m && Array.isArray(m.data.panels) ? m.data.panels.find((r) => r[0] === 'main') : null;
-    if (row) {
-      const lay = C.menu(S.stateOf(p.slot), m.data.info || {});
-      if (!o.panel) { o.panel = new Panel(0.42, lay); scene.add(o.panel.mesh); }
-      o.panel.mesh.visible = true;
-      o.panel.pose({ x: row[1], y: row[2], h: row[3], yaw: row[4], pitch: row[5] });
-      const look = { edge: PLAYER_COLOURS[p.slot % PLAYER_COLOURS.length], note: (m.data.info && m.data.info.note) || `player ${p.slot + 1}` }, key = JSON.stringify([lay.buttons.map((b) => [b.label, b.value, b.active, b.off]), look.note]);
-      if (key !== o.key) { o.key = key; o.panel.draw(lay, look); }        // (only when it changed: a redraw is a canvas and a texture upload)
-    } else if (o.panel) o.panel.mesh.visible = false;
+    // that player's menus, where they float, drawn from its own state and mode (the same layouts the headsets draw): the cube's menu ('main')
+    // and the engine's menu on the wrist ('wrist', client/sysmenu.js)
+    const m = feed.sample('menus', p.slot), info = m ? m.data.info || {} : {};
+    for (const id of ['main', 'wrist']) {
+      const row = m && Array.isArray(m.data.panels) ? m.data.panels.find((r) => r[0] === id) : null;
+      let q = o.panels[id];
+      if (!row) { if (q) q.panel.mesh.visible = false; continue; }
+      const wrist = id === 'wrist', lay = wrist ? M.sysmenu.SysMenu.layout(info.sys) : C.menu(S.stateOf(p.slot), info);
+      if (!q) { q = o.panels[id] = { panel: new Panel(0.42, lay), key: '' }; scene.add(q.panel.mesh); }
+      q.panel.setWidth(wrist ? M.sysmenu.SysMenu.width(info.sys) : 0.42);
+      q.panel.mesh.visible = true;
+      q.panel.pose({ x: row[1], y: row[2], h: row[3], yaw: row[4], pitch: row[5] });
+      const look = { edge: PLAYER_COLOURS[p.slot % PLAYER_COLOURS.length], note: wrist ? (info.sys && info.sys.note) || '' : `player ${p.slot + 1}` };
+      const key = JSON.stringify([lay.w, lay.h, lay.buttons.map((b) => [b.label, b.value, b.active, b.off]), look.note]);
+      if (key !== q.key) { q.key = key; q.panel.draw(lay, look); }        // (only when it changed: a redraw is a canvas and a texture upload)
+    }
   }
-  for (const [slot, o] of [...drawn]) if (!here.has(slot)) { for (const x of [o.headM, o.dots, o.check]) world.remove(x); if (o.panel) o.panel.dispose(); o.legs.dispose(); drawn.delete(slot); }
+  for (const [slot, o] of [...drawn]) if (!here.has(slot)) { for (const x of [o.headM, o.dots, o.check]) world.remove(x); for (const q of Object.values(o.panels)) q.panel.dispose(); o.legs.dispose(); drawn.delete(slot); }
   spots[0].visible = spots[1].visible = dist !== null;
   if (dist !== null) spots[1].position.set(dist, 0.002, 0);
   const st = feed.status();

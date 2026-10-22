@@ -2,7 +2,8 @@
 //   * the CUBE: a 12 cm cube on the floor. Every hand pushes it (each fingertip, the palm and every joint), and it is HELD only by a
 //     pinch (index and thumb touching each other) that starts at the cube. It falls when let go, slides and slows on the floor;
 //   * its BODY adapter (MUMR body.js): the token 'cube' follows touch, the holder sends packet 16;
-//   * the MENU: the same layout for this player's menu, another player's menu, and the PC view.
+//   * the MENU: the app's own (the engine's menu, with Line up, Room setup and Exit, is on the wrist: client/sysmenu.js); the same layout
+//     for this player's menu, another player's menu, and the PC view.
 // The cube is simulated on this page's floor plan (x, y on the floor, z = height of its middle above this headset's floor).
 (function (C) {
   const M = typeof module !== 'undefined' ? require('../../client/index.js') : globalThis.MUMR;
@@ -139,7 +140,7 @@
   // ---- the menu, for whoever draws it: state = that player's (session.stateOf), info = what its owner says about it (lining up ...)
   const GAME = { count: 0, colour: 0 };
   const PLAYER = { ghost: true };
-  const ACTIONS = M.lineup.ACTIONS.concat(['cubeHere', 'exit']);
+  const ACTIONS = ['cubeHere'];                    // (the app's own; the engine's are client/sysmenu.js SysMenu.ACTIONS)
   function press(id, st) {
     if (id === 'plus') return Object.assign({}, st, { count: st.count + 1 });
     if (id === 'colour') return Object.assign({}, st, { colour: (st.colour + 1) % COLOURS.length });
@@ -148,13 +149,10 @@
   }
   function menu(st, info) {
     info = info || {};
-    if (info.lining) {
-      return M.menus.grid({ w: 1024, title: 'Line up', note: info.note || '', top: [{ id: 'lineUp', label: 'Done', active: true, w: 180 }], rows: M.lineup.rowsFrom(info.fields, info.lined) });
-    }
-    return M.menus.grid({ w: 1024, title: 'MUMR cube', note: info.note || '', top: [{ id: 'lineUp', label: info.lined ? 'Lined up' : 'Line up', w: 200 }],
+    return M.menus.grid({ w: 1024, title: 'MUMR cube', note: info.note || '',
       rows: [
         [{ id: 'plus', label: 'Count', value: String(st.count) }, { id: 'colour', label: 'Cube colour', value: COLOURS[st.colour % COLOURS.length].slice(1), active: true }, { id: 'cubeHere', label: 'Cube here', value: 'in front of me' }],
-        [{ id: 'ghost', label: 'Ghost fingers', value: st.ghost ? 'shown' : 'hidden', active: !!st.ghost }, { label: 'Players', value: String(info.players || 1) }, { id: 'exit', label: 'Exit', value: 'leave MR' }],
+        [{ id: 'ghost', label: 'Ghost fingers', value: st.ghost ? 'shown' : 'hidden', active: !!st.ghost }, { label: 'Players', value: String(info.players || 1) }],
       ] });
   }
 

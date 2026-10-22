@@ -12,16 +12,16 @@
 (function (M) {
   const PAD = 14, TITLE_H = 60, ROW_H = 96;
 
-  // spec: { w (px, 1024), title, top: [{ id, label, active }] (buttons in the title bar, from the right), rows: [[{ id, label, value,
+  // spec: { w (px, 1024), titleH (px, 60; 0: no title bar), rowH (px, 96), title, top: [{ id, label, active }] (buttons in the title bar, from the right), rows: [[{ id, label, value,
   // active, off, span }]] }
   function grid(spec) {
-    const W = spec.w || 1024, rows = spec.rows || [], rowH = spec.rowH || ROW_H;
-    const H = TITLE_H + rows.length * (rowH + PAD) + PAD, buttons = [];
+    const W = spec.w || 1024, rows = spec.rows || [], rowH = spec.rowH || ROW_H, TH = spec.titleH === undefined ? TITLE_H : spec.titleH;
+    const H = TH + rows.length * (rowH + PAD) + PAD, buttons = [];
     let x = W - PAD;
     for (const b of (spec.top || [])) {
       const bw = b.w || 200;
       x -= bw;
-      buttons.push(Object.assign({ value: '', active: false, off: false, top: true }, b, { x, y: 8, w: bw, h: TITLE_H - 16 }));
+      buttons.push(Object.assign({ value: '', active: false, off: false, top: true }, b, { x, y: 8, w: bw, h: TH - 16 }));
       x -= PAD;
     }
     rows.forEach((row, r) => {
@@ -29,11 +29,11 @@
       let cx = PAD;
       for (const c of row) {
         const cw = unit * (c.span || 1) + PAD * ((c.span || 1) - 1);
-        buttons.push(Object.assign({ value: '', active: false, off: false }, c, { x: cx, y: TITLE_H + PAD / 2 + r * (rowH + PAD), w: cw, h: rowH }));
+        buttons.push(Object.assign({ value: '', active: false, off: false }, c, { x: cx, y: TH + PAD / 2 + r * (rowH + PAD), w: cw, h: rowH }));
         cx += cw + PAD;
       }
     });
-    return { w: W, h: H, title: { text: spec.title || '', note: spec.note || '', h: TITLE_H }, buttons };
+    return { w: W, h: H, title: { text: spec.title || '', note: spec.note || '', h: TH }, buttons };
   }
   function hit(lay, u, v) {
     if (!lay || u < 0 || u > 1 || v < 0 || v > 1) return null;
@@ -58,13 +58,14 @@
   // within 8 cm of it (so a hand that comes round from behind presses nothing: from behind a menu is a blank wall). One press in 400 ms.
   class Poke {
     constructor(cfg = {}) { this.cfg = Object.assign({ front: 0.004, depth: 0.08, hover: 0.06, busy: 0.25, gap: 400 }, cfg); this.was = new Map(); this.pressedAt = -1e9; }
-    // panels: [{ key, owner, id, pose, w, h (metres), lay }]; tips: [{ id, p: [x, y, z] (XR) }]; -> { presses, hover, busy (Set of keys) }
+    // panels: [{ key, owner, id, pose, w, h (metres), lay, ignore (a tip id that does not press it) }]; tips: [{ id, p: [x, y, z] (XR) }]; -> { presses, hover, busy (Set of keys) }
     update(panels, tips, nowMs) {
       const C = this.cfg, out = { presses: [], hover: null, busy: new Set() };
       const seen = new Set();
       for (const pn of panels) {
         const A = axes(pn.pose);
         for (const t of tips) {
+          if (pn.ignore && pn.ignore === t.id) continue;          // (a menu on a wrist is not pressed by the fingers of that hand)
           const d = sub(t.p, A.pos), lx = dot(d, A.right), ly = dot(d, A.up), lz = dot(d, A.normal), k = `${pn.key}|${t.id}`;
           seen.add(k);
           const u = lx / pn.w + 0.5, v = 0.5 - ly / pn.h, inside = Math.abs(lx) <= pn.w / 2 && Math.abs(ly) <= pn.h / 2;

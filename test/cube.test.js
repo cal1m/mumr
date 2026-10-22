@@ -78,11 +78,36 @@ test('two headsets: B pushes the cube, takes the token by touching it, and A see
   assert.ok(Math.hypot(nb[0] + 1, nb[1] + 1) < 1e-6);
 });
 
-test('the menu: the same layout from the owner\'s state and info, lining up or not', () => {
-  const lay = C.menu({ count: 4, colour: 1, ghost: true }, { lined: true, players: 2 });
-  assert.deepStrictEqual(lay.buttons.filter((q) => q.id).map((q) => q.id), ['lineUp', 'plus', 'colour', 'cubeHere', 'ghost', 'exit']);
+test('the cube menu has only the cube’s items; the engine items are on the wrist menu', () => {
+  const lay = C.menu({ count: 4, colour: 1, ghost: true }, { players: 2 });
+  assert.deepStrictEqual(lay.buttons.filter((q) => q.id).map((q) => q.id), ['plus', 'colour', 'cubeHere', 'ghost']);
   assert.strictEqual(lay.buttons.find((q) => q.id === 'plus').value, '4');
-  const lining = C.menu({ count: 0, colour: 0, ghost: true }, { lining: true, lined: false, fields: [{ placed: true }, { armed: true, left: 3 }, {}] });
-  assert.deepStrictEqual(lining.buttons.filter((q) => q.id).map((q) => q.id), ['lineUp', 'p1create', 'p1delete', 'p1lock', 'p2create', 'p2delete', 'p2lock', 'p3create', 'p3delete', 'p3lock']);
-  assert.ok(lining.buttons.find((q) => q.id === 'p3create').off, 'no check mark before spots 1 and 2');
+  const SM = M.sysmenu.SysMenu;
+  const ids = (l) => l.buttons.filter((q) => q.id).map((q) => q.id);
+  assert.deepStrictEqual(ids(SM.layout({ open: false })), ['sysOpen'], 'folded: one wrist button');
+  assert.deepStrictEqual(ids(SM.layout({ open: true, lined: true, dist: 3.34 })), ['sysClose', 'lineUp', 'roomSetup', 'exit']);
+  assert.deepStrictEqual(ids(SM.layout({ open: true, lining: true, fields: [{ placed: true }, {}, {}] })), ['sysClose', 'lineUp', 'p1create', 'p1delete', 'p1lock', 'p2create', 'p2delete', 'p2lock', 'p3create', 'p3delete', 'p3lock']);
+  assert.ok(SM.width({ open: true }) > SM.width({ open: false }) * 3);
+});
+
+test('the wrist menu: its buttons act at its owner, Line up opens it, and it shows while the inside of the left wrist looks at you', () => {
+  const S = new M.session.Session(null, {}), sp = new M.align.Space(null, 0), L = new M.lineup.LineUp(S, sp), done = [];
+  const sys = new M.sysmenu.SysMenu(S, L, { exit: () => done.push('exit'), roomSetup: () => done.push('room') });
+  assert.deepStrictEqual([sys.press('sysOpen'), sys.open, sys.press('sysClose'), sys.open], [true, true, true, false]);
+  sys.press('lineUp');
+  assert.deepStrictEqual([L.active, sys.open, sys.info().lining], [true, true, true], 'lining up opens it, so that the fields are seen');
+  sys.press('exit'); sys.press('roomSetup');
+  assert.deepStrictEqual(done, ['exit', 'room']);
+  assert.strictEqual(sys.press('plus'), false, 'not one of the engine’s');
+  // a left hand held up in front of the eyes (1.6 m), palm side towards them: wrist joints in XR space
+  const jp = new Float32Array(75), set = (i, x, y, z) => { jp[i * 3] = x; jp[i * 3 + 1] = y; jp[i * 3 + 2] = z; };
+  set(0, 0, 1.3, -0.35); set(6, 0.03, 1.38, -0.35); set(11, 0, 1.39, -0.35); set(21, -0.035, 1.37, -0.35);
+  const head = [0, 0, Math.PI / 2, 1.6, -0.5];
+  let pose = sys.place(head, jp, 0);
+  const flipped = new Float32Array(jp); flipped[6 * 3] = -0.03; flipped[21 * 3] = 0.035;
+  const other = sys.place(head, flipped, 0);
+  assert.ok((pose === null) !== (other === null), 'one side of the wrist shows it, the other hides it');
+  pose = pose || sys.place(head, jp, 0) || sys.place(head, flipped, 0);
+  assert.ok(pose && Number.isFinite(pose.yaw) && pose.h > 1, JSON.stringify(pose));
+  assert.strictEqual(sys.place(head, null, 0), null, 'no hand: no menu');
 });

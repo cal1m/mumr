@@ -46,11 +46,18 @@ life(`page loaded (${navigator.userAgent.slice(0, 80)})`);
 document.addEventListener('visibilitychange', () => { life(`page ${document.visibilityState}`); if (document.hidden && !xr) away(); });
 const link = M.link.connect(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`, { build: info.build, name: NAME });
 link.onNote = (n) => life(`link: ${n}`);
-const S = new M.session.Session(link, { game: C.GAME, player: C.PLAYER, actions: C.ACTIONS, press: C.press });
+const SysMenu = M.sysmenu.SysMenu;
+const S = new M.session.Session(link, { game: C.GAME, player: C.PLAYER, actions: SysMenu.ACTIONS.concat(C.ACTIONS), press: C.press });
 const space = new M.align.Space(null, 0);
 const presence = new M.presence.Presence(S, space);
-const menus = new M.menus.Menus(S, space, { known: (id) => id === 'main' });
+const menus = new M.menus.Menus(S, space, { known: (id) => id === 'main' || id === 'wrist' });
 const lineup = new M.lineup.LineUp(S, space, { store: LS, say, life });
+// the engine's menu on the left wrist: Line up, Room setup, Exit (the cube's own menu floats: cube.js menu)
+const sys = new SysMenu(S, lineup, {
+  exit: () => { if (xr) xr.session.end(); else say('Not in mixed reality'); },
+  roomSetup: () => { const r = xr ? xr.roomSetup() : 'none'; say(r === 'started' ? 'Room setup: the headset takes over' : r === 'used' ? 'Room setup was used once: leave mixed reality and come back for it again' : 'No room setup here'); },
+  roomUsed: () => !!(xr && xr.roomUsed),
+});
 const cube = new C.Cube();
 const body = new M.body.Body(S, { token: 'cube', type: 'cube', adapter: C.adapter(cube, space) });
 const pinch = new M.hands.Pinch(), poke = new M.menus.Poke(), follower = new M.follow.Follower();
@@ -66,6 +73,8 @@ S.on('token', (t, mine) => { if (t === 'cube') life(`cube: ${mine ? 'simulated h
 // a page nobody looks at (a hidden tab, a headset taken off) draws no frames: it must not hold the cube, or nobody sees it move
 // (also when the frame loop has stopped without the page saying it is hidden: a paused tab, a frozen page)
 setInterval(() => { if (performance.now() - last > 1000) away(); }, 500);
+// the line-up note of another player's wrist menu (it comes in that player's menus info)
+const oiNote = (slot) => { const o = menus.others(performance.now()).find((q) => q.slot === slot); return o && o.info && o.info.sys ? o.info.sys.note : ''; };
 let awayAt = -1e9;
 function away() { const now = performance.now(); if (now - awayAt < 5000 || !S.connected || !S.holds('cube') || !(S.others || S.hostHere)) return; awayAt = now; S.release('cube'); life('cube: given up (this page is not looked at)'); }
 S.on('leave', (why) => { if (why === 'version') say('This page is older than the server\'s: reload it'); });
@@ -76,12 +85,12 @@ if (QS.has('frame')) {
 }
 // a button that is an action happened on this page's menu (pressed here or by another player)
 function action(id, from) {
-  if (lineup.press(id)) return;
+  if (sys.press(id)) return;
   if (id === 'cubeHere') {
     const h = head, x = h[0] + Math.cos(h[2]) * 0.5, y = h[1] + Math.sin(h[2]) * 0.5, c = space.ok ? space.toCommon([x, y]) : [x, y];
     body.ask('place', { x: c[0], y: c[1] });
     say(from === S.me || from === null ? 'The cube is in front of you' : `Player ${from + 1} put the cube in front of you`);
-  } else if (id === 'exit') { if (xr) xr.session.end(); else say('Not in mixed reality'); }
+  }
 }
 function say(text) { $('say').textContent = text; sayT = performance.now(); life(`said: ${text}`); }
 
@@ -123,8 +132,8 @@ canvas.addEventListener('pointermove', (ev) => { if (!mouse) return; pointer(ev)
 canvas.addEventListener('pointerup', () => { mouse = null; });
 canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
 let pressedLook = { key: null, id: null, t: -1e9 };
-function pressed(owner, id) {
-  const key = owner === null || owner === S.me ? 'own:main' : `${owner}:main`;
+function pressed(owner, id, key) {
+  key = key || (owner === null || owner === S.me ? 'own:main' : `${owner}:main`);
   pressedLook = { key, id, t: performance.now() };
   S.press(owner === S.me ? null : owner, id);
 }
@@ -176,15 +185,19 @@ function onFrame(time, frame) {
   body.send(now);
   // the menus: ours follows us in mixed reality and stands still on the desktop; everybody's can be pressed
   if (!follower.pose) { if (xr) follower.snap({ x: head[0], y: head[1], th: head[2], py: head[3] + space.floorY }); else follower.set({ x: 0.9, y: 0.55, h: 0.95, yaw: -2.4, pitch: 0.15 }); }
-  const st = S.stateOf(null), ownInfo = Object.assign(lineup.info(), { players: S.others + 1 });
-  const lay = C.menu(st, ownInfo), want = new Set(['own:main']);
+  const st = S.stateOf(null), sysInfo = sys.info(), ownInfo = { players: S.others + 1, sys: sysInfo };
+  const lay = C.menu(st, ownInfo), want = new Set(['own:main', 'own:wrist']);
   const busyKeys = new Set();
   const list = [{ key: 'own:main', owner: null, id: 'main', pose: follower.pose, w: 0.42, lay }];
+  // the wrist menu: on the left wrist in mixed reality (while it looks at you), beside the cube's menu on the desktop
+  const leftHand = handsXR.find((h) => h.id === M.sysmenu.WRIST_SIDE && h.jp);
+  const wristPose = xr ? sys.place(head, leftHand ? leftHand.jp : null, space.floorY) : { x: 0.55, y: 0.85, h: 0.95, yaw: -2.0, pitch: 0.15 };
+  if (wristPose) list.push({ key: 'own:wrist', owner: null, id: 'wrist', pose: wristPose, w: SysMenu.width(sysInfo), lay: SysMenu.layout(sysInfo), ignore: M.sysmenu.WRIST_SIDE });
   for (const o of menus.others(now)) for (const p of o.panels) {
-    const key = `${o.slot}:${p.id}`, olay = C.menu(S.stateOf(o.slot), o.info || {});
+    const key = `${o.slot}:${p.id}`, oi = o.info || {}, wrist = p.id === 'wrist', olay = wrist ? SysMenu.layout(oi.sys) : C.menu(S.stateOf(o.slot), oi);
     const q = panelsAll.get(key), cur = q && q.pose ? q.pose : p.pose, k = 1 - Math.exp(-dt * 18);
     const eased = { x: cur.x + (p.pose.x - cur.x) * k, y: cur.y + (p.pose.y - cur.y) * k, h: cur.h + (p.pose.h - cur.h) * k, yaw: cur.yaw + M.util.wrap(p.pose.yaw - cur.yaw) * k, pitch: p.pose.pitch };
-    list.push({ key, owner: o.slot, id: p.id, pose: eased, w: 0.42, lay: olay });
+    list.push({ key, owner: o.slot, id: p.id, pose: eased, w: wrist ? SysMenu.width(oi.sys) : 0.42, lay: olay });
     want.add(key);
   }
   for (const pn of list) pn.h = pn.w * pn.lay.h / pn.lay.w;
@@ -193,7 +206,7 @@ function onFrame(time, frame) {
     const r = poke.update(list, tips, now);
     hover = r.hover;
     for (const k of r.busy) busyKeys.add(k);
-    for (const pr of r.presses) pressed(pr.owner, pr.button);
+    for (const pr of r.presses) pressed(pr.owner, pr.button, pr.key);
   }
   // the handle under our menu: a pinch that starts at it carries the menu; where it is let go is where it stays (and how far and how high
   // it keeps to us from then on: follow.js place)
@@ -212,19 +225,20 @@ function onFrame(time, frame) {
   }
   if (xr) follower.update(hd, dt, busyKeys.has('own:main'));
   list[0].pose = follower.pose;
-  menus.send(now, [{ id: 'main', pose: follower.pose }], ownInfo);
+  menus.send(now, [{ id: 'main', pose: follower.pose }].concat(wristPose ? [{ id: 'wrist', pose: wristPose }] : []), ownInfo);
   const redraw = now - redrawAt > 100;
   if (redraw) redrawAt = now;
   for (const pn of list) {
     let q = panelsAll.get(pn.key);
-    if (!q) { q = { panel: new Panel(pn.w, pn.lay, { handle: pn.owner === null }) }; panelsAll.set(pn.key, q); scene.add(q.panel.mesh); }
-    if (pn.owner === null) q.panel.handleLook(handle);
+    if (!q) { q = { panel: new Panel(pn.w, pn.lay, { handle: pn.key === 'own:main' }) }; panelsAll.set(pn.key, q); scene.add(q.panel.mesh); }
+    q.panel.setWidth(pn.w);
+    if (pn.key === 'own:main') q.panel.handleLook(handle);
     Object.assign(q, { owner: pn.owner, id: pn.id, lay: pn.lay, pose: pn.pose });
     q.panel.pose(pn.pose);
     if (redraw || pressedLook.key === pn.key) {
       const sayNote = pn.owner === null && now - sayT < 3000 ? $('say').textContent : undefined;
       q.panel.draw(pn.lay, { hover: hover && hover.key === pn.key ? hover.button : null, pressed: pressedLook.key === pn.key && now - pressedLook.t < 250 ? pressedLook.id : null,
-        edge: pn.owner === null ? null : PLAYER_COLOURS[pn.owner % PLAYER_COLOURS.length], note: sayNote || (pn.owner === null ? lineup.note() : (pn.lay.title.note || `player ${pn.owner + 1}`)) });
+        edge: pn.owner === null ? null : PLAYER_COLOURS[pn.owner % PLAYER_COLOURS.length], note: sayNote || (pn.id === 'wrist' ? (pn.owner === null ? lineup.note() : (oiNote(pn.owner) || `player ${pn.owner + 1}`)) : (pn.owner === null ? '' : `player ${pn.owner + 1}`)) });
     }
   }
   for (const [key, q] of [...panelsAll]) if (!want.has(key)) { q.panel.dispose(); panelsAll.delete(key); }

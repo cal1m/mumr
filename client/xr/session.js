@@ -54,6 +54,17 @@ export async function enterXR({ renderer, life = () => {}, onReset = () => {}, o
     now: () => performance.now(),
     life,
   });
+  // The headset's own room setup (Quest: Space Setup), as Nudgy's Room setup button did. The browser allows it once in a session; after that the
+  // way is to leave mixed reality and come back. -> 'started' | 'used' (once already: leave and come back) | 'none' (this browser has none)
+  xr.roomUsed = false;
+  xr.roomSetup = () => {
+    if (!session.initiateRoomCapture) return 'none';
+    if (xr.roomUsed) return 'used';
+    xr.roomUsed = true;
+    try { Promise.resolve(session.initiateRoomCapture()).then(() => life('xr: room setup done'), (e) => life(`xr: room setup: ${e && e.message ? e.message : e}`)); } catch (e) { life(`xr: room setup: ${e && e.message ? e.message : e}`); }
+    life('xr: room setup started');
+    return 'started';
+  };
   xr.sharedFrame = () => {
     if (!xr.sharedSpace || !xr.shared.uuid || !xr.frame) return null;
     const p = xr.frame.getPose(xr.sharedSpace, xr.refSpace);

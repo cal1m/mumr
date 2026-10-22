@@ -65,8 +65,11 @@ link.onBin = (b) => { const p = MUMR.wire.decode(b); if (p.name === 'presence') 
 
 `examples/cube/app.js` is the worked example. The pieces:
 
-- `new MUMR.lineup.LineUp(session, space, { store: localStorage, say, life })`; add `MUMR.lineup.ACTIONS` to the session's `actions`
-  and call `lineup.press(id)` from the `action` listener; when mixed reality starts, `lineup.restart()` and
+- The engine's menu is on the wrist: `new MUMR.sysmenu.SysMenu(session, lineup, { exit, roomSetup, roomUsed })`; add `SysMenu.ACTIONS`
+  to the session's `actions` and call `sys.press(id)` first from the `action` listener; draw it at `sys.place(head, leftHandJoints,
+  floorY)` with `SysMenu.layout(sys.info())`, and send it as panel `wrist` with `{ sys: sys.info() }` in the menus' info. The app's own
+  menu holds only the app's items.
+- `new MUMR.lineup.LineUp(session, space, { store: localStorage, say, life })` (the wrist menu presses it); when mixed reality starts, `lineup.restart()` and
   `lineup.setKeeper(new MUMR.anchor.Keeper(xr.anchorIO('myapp.anchor')))`, and `keeper.update()` every XR frame.
 - `enterXR({ renderer, life, onReset: (F) => keeper.reset(F), onEnd })` (`/mumr/xr/session.js`), then every frame
   `xr.frame = frame` and `readInput(xr, frame, space, pinch)` (`/mumr/xr/input.js`) for the sources and the fingertips.

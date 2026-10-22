@@ -13,8 +13,11 @@ py -3 server/serve.py examples/cube
 
 1. Start the server first and check that `examples/cube/mumr-server.log` is being written (it is from the first line).
 2. On each headset open the `https://` address the server prints, accept the certificate once, press **Enter mixed reality**.
-3. Press **Line up** on the menu, rest an index fingertip on cross 1 and then cross 2 (10 s each), Create on spot 3 and rest on cross
-   3 to check. Press **Done**. Do the same on the other headset (or press its Line up for it: every button works from every menu).
+3. Look at the inside of your left wrist: a small **MUMR** button sits there. Poke it with the right index finger to open the engine's
+   menu (Line up, Room setup, Exit; "-" folds it again). Press **Line up**, rest an index fingertip on cross 1 and then cross 2
+   (10 s each), Create on spot 3 and rest on cross 3 to check. Press **Done**. Do the same on the other headset (or press its Line up
+   for it on its wrist: every button works from every menu). The floating menu is the cube's own (count, colour, cube here, ghost
+   fingers); carry it by the bar under it.
 4. Push the cube, pick it up, drop it on the floor or into the other player's hand. Press buttons on the other player's menu.
 5. On the PC, open `view.html` (the link on the page) to watch.
 6. Take a headset off and put it back on without leaving mixed reality: the line-up should come back from the anchor within a few

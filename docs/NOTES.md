@@ -177,3 +177,7 @@ Kept from the first plan's section 6, plus what came after it:
   not a player), `client/host.js` (Node: the app's own simulation with everybody's hands, in the common frame), the server starts
   and restarts it, bodies go to it first and come back to it at rest. Rehearsed: a page pushed the cube 34 cm, it came to rest and
   went back to the host, and a page opened later found it where it was left. 78 Node, 48 Python tests. Not yet on a headset.
+- **2026-10-22 (evening)** Who simulates the cube is shown on it (an outline in their colour and a label). The menu is split (Marek: "parts
+  of the menu are engine-essential ... a wrist based popup that minimizes into a wrist button"): `client/sysmenu.js` is the engine's
+  menu on the inside of the left wrist (Line up with its spot rows, Room setup = the headset's own room capture, Exit), shared as panel
+  `wrist`; the cube's floating menu holds only the cube's items. Rehearsed in the browser and on the PC view; 79 Node tests.

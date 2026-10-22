@@ -80,6 +80,15 @@ export function makePanels(THREE, renderer) {
       }
       this.lay = lay;
     }
+    // the width in metres (a menu that opens and folds changes it)
+    setWidth(w) {
+      if (w === this.width) return;
+      this.width = w;
+      if (!this.lay) return;
+      const h = w * this.lay.h / this.lay.w;
+      this.plane.scale.set(w, h, 1);
+      if (this.handle) this.handle.position.set(0, -h / 2 - HANDLE_GAP, 0);
+    }
     draw(lay, look) { this.setLayout(lay); drawGrid(this.ctx, lay, look); this.tex.needsUpdate = true; }
     // 'idle', 'near' (a hand is at it), 'held' (it is being carried)
     handleLook(state) {
