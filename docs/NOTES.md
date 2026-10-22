@@ -94,7 +94,10 @@ Each item: what is there now in Nudgy, why it costs, what MUMR does instead. **D
     draws no frames, so nobody saw the cube move). Rule: a hidden page, a headset taken off (XR visibility `hidden`) or a page whose
     frame loop has stopped for a second releases its bodies; the hub gives a released body to the earliest other player. **Done.**
 26. **A Wi-Fi stall of 4 s made the headset reconnect as a new player** (first run, 18:11:27), so its tokens and slot changed. Not
-    fixed yet: a resume (the same slot back with the join key, within a few seconds) would keep a player's place.
+    fixed then. **Done** (2026-10-22, Marek chose it next): the hub keeps a dropped player's place for 10 s (slot, settings, line-up,
+    owned things; its tokens go at once so nothing waits), the link rejoins with `{ resume: { slot, key } }` from its last hello (kept
+    in sessionStorage, so a reload comes back too), and the others are never told it left. A page that closes on purpose says `bye`
+    and is gone at once. Tested in the hub, the link and against the real server; not yet on a headset.
 
 27. **Two pages that nobody looks at handed the cube to each other for ever** (first two-headset run: about 4800 hand-overs in the
     4 minutes after both left mixed reality). The hub no longer gives a released body to a player that released the same body in

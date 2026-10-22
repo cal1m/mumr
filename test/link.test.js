@@ -24,6 +24,24 @@ function make(extra = {}) {
   link.onNote = (w) => notes.push(w); link.onClose = (w) => closes.push(w);
   return { link, notes, closes, tick: (ms) => { clock += ms; }, ws: () => FakeWS.all[FakeWS.all.length - 1] };
 }
+test('a link that dropped comes back with the place it had (resume), and a deliberate close says bye and forgets it', async () => {
+  const store = new Map(), storage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, v), removeItem: (k) => store.delete(k) };
+  const m = make({ store: storage });
+  m.ws().open(); m.ws().say({ t: 'hello', role: 'player', slot: 2, key: 'k2', peers: [], tokens: {}, n: 0 });
+  assert.strictEqual(m.ws().sent[0].resume, undefined, 'the first join has nothing to come back to');
+  m.ws().hang(1006, '');
+  await sleep(60);
+  m.ws().open();
+  assert.deepStrictEqual(m.ws().sent[0].resume, { slot: 2, key: 'k2' });
+  m.ws().say({ t: 'hello', role: 'player', slot: 2, key: 'k2', resumed: true, peers: [], tokens: {}, n: 0 });
+  assert.strictEqual(m.link.resumed, true);
+  assert.ok(m.notes.some((n) => /came back to its place/.test(n)), m.notes.join(' | '));
+  const w = m.ws();
+  m.link.close();
+  assert.deepStrictEqual(w.sent[w.sent.length - 1], { t: 'bye' });
+  assert.strictEqual(store.has('mumr.resume'), false);
+});
+
 const join = (m) => { m.ws().open(); m.ws().say({ t: 'hello', slot: 0, peers: [], tokens: { sim: 0, holo: 0 }, n: 0 }); };
 
 test('a connection that says nothing any more is given up on and made again, instead of being believed in', async () => {

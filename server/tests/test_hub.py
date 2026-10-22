@@ -42,6 +42,7 @@ def join(h, name="p", role=None, build=BUILD):
 
 def make(n=2, **kw):
     clock = Clock()
+    kw.setdefault("resume_hold", 0)           # (most tests: a player who leaves is gone at once; ResumeTest keeps places)
     h = hub.Hub(lambda: BUILD, clock, **kw)
     return h, clock, [join(h, f"p{i}") for i in range(n)]
 
@@ -316,7 +317,7 @@ class DeadTest(unittest.TestCase):
         self.assertEqual(a.of("peer")[-1]["on"], False)
 
     def test_an_old_connection_cannot_speak_for_a_newcomer_in_its_slot(self):
-        h = hub.Hub(lambda: BUILD, Clock())
+        h = hub.Hub(lambda: BUILD, Clock(), resume_hold=0)
         old, new = object(), object()
         a = FakePeer()
         h.join(a.texts.append, a.bins.append, {"t": "join", "build": BUILD}, conn=old)
@@ -326,6 +327,60 @@ class DeadTest(unittest.TestCase):
         h.text(0, {"t": "ev", "e": {"k": "x"}}, conn=old)
         h.leave(0, conn=old)
         self.assertEqual((b.of("ev"), 0 in h.peers), ([], True))
+
+
+class ResumeTest(unittest.TestCase):
+    def setUp(self):
+        self.h, self.clock, (self.a, self.b) = make(bodies=("cube",), resume_hold=10)
+        self.h.text(1, {"t": "ev", "e": {"k": "frame", "key": "frame:1", "scope": "slot", "line": {"dist": 3}}})
+        self.h.text(1, {"t": "claim", "body": "cube"})
+        self.key = self.b.of("hello")[0]["key"]
+
+    def rejoin(self, key=None, slot=1, conn=None, kill=None):
+        p = FakePeer()
+        p.id = self.h.join(p.texts.append, p.bins.append, {"t": "join", "build": BUILD, "name": "again", "resume": {"slot": slot, "key": key or self.key}}, conn=conn, kill=kill)
+        return p
+
+    def test_a_dropped_player_comes_back_to_its_place_and_nobody_was_told_it_left(self):
+        self.h.leave(1)
+        self.assertEqual(self.h.tokens["cube"], 0, "its tokens go at once")
+        self.assertIn("frame:1", self.h.doc, "its line-up stays")
+        self.assertEqual(self.a.of("peer"), [{"t": "peer", "slot": 1, "name": "p1", "on": True}], "no one is told it left")
+        c = join(self.h, "newcomer")
+        self.assertEqual(c.id, 2, "its slot is not given away")
+        self.assertEqual([q["slot"] for q in c.of("hello")[0]["peers"]], [0, 1])
+        self.clock.t += 5
+        back = self.rejoin()
+        hb = back.of("hello")[0]
+        self.assertEqual((back.id, hb["resumed"], hb["key"]), (1, True, self.key))
+        self.assertEqual([q["slot"] for q in hb["peers"]], [0, 2])
+        self.assertEqual(len(self.a.of("peer")), 2, "only the newcomer's join was told")
+
+    def test_too_late_it_is_gone_and_a_wrong_key_is_a_new_player(self):
+        self.h.leave(1)
+        self.clock.t += 11
+        self.h.tick()
+        self.assertEqual(self.a.of("peer")[-1], {"t": "peer", "slot": 1, "name": "p1", "on": False})
+        self.assertNotIn("frame:1", self.h.doc)
+        p = self.rejoin(key="nope")
+        self.assertEqual((p.id, p.of("hello")[0].get("resumed")), (1, None), "a new player (slot 1 is free again)")
+
+    def test_coming_back_while_the_hub_still_holds_the_old_connection_closes_it(self):
+        old, killed = object(), []
+        h = hub.Hub(lambda: BUILD, Clock(), resume_hold=10)
+        a = FakePeer()
+        a.id = h.join(a.texts.append, a.bins.append, {"t": "join", "build": BUILD}, conn=old, kill=lambda: killed.append(1))
+        key = a.of("hello")[0]["key"]
+        b = FakePeer()
+        b.id = h.join(b.texts.append, b.bins.append, {"t": "join", "build": BUILD, "resume": {"slot": 0, "key": key}}, conn=object())
+        self.assertEqual((b.id, killed), (0, [1]))
+        h.leave(0, conn=old)
+        self.assertIn(0, h.peers, "the old connection's leave is not the new one's")
+
+    def test_a_page_that_says_bye_is_gone_at_once(self):
+        self.h.text(1, {"t": "bye"})
+        self.h.leave(1)
+        self.assertEqual(self.a.of("peer")[-1]["on"], False)
 
 
 class OutboxTest(unittest.TestCase):

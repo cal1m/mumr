@@ -9,6 +9,12 @@ Two roles join (the first message, {t:'join', build, name, role}):
 A join from a page of another build is refused ({t:'refused', why:'version'}): a headset that runs an old page is the most
 common cause of "half of it works".
 
+COMING BACK. A player's hello carries a `key`. A player whose connection goes (a Wi-Fi stall makes the page give up after 4 s; a reload)
+keeps its place for `resume_hold` seconds: its slot, its settings, its line-up and its owned things stay, the others are not told it
+left, only its tokens go to others at once (so that nothing waits for it). A join with {resume: {slot, key}} in that time gets the same
+slot back (hello.resumed: true), also when the hub still holds the old connection (it is closed then). After that time it is gone as
+usual ('peer' off to everyone). First headset run, 2026-10-22: a 4 s stall made the headset come back as a new player.
+
 Text messages (dicts) from a player:
     {t:'ev', e}            an event of the shared document: numbered and sent to everyone (viewers too), the sender too
     {t:'to', to, m}        a message for one slot
@@ -19,6 +25,7 @@ Text messages (dicts) from a player:
                            nobody looks at: a hidden tab, a headset taken off)
     {t:'ping', c}          answered with {t:'pong', c, s}: s is the hub's clock (ms); also how the hub knows the page is alive
     {t:'clock', off}       the page's offset to the hub's clock (ms); passed on to everyone as {t:'clock', slot, off}
+    {t:'bye'}              the page is closing on purpose: its place is not kept when its connection goes
 
 THE DOCUMENT. The hub keeps a compacted copy of the events: the newest event for each thing, in the order they last happened, and
 gives it to everyone who joins (hello.doc, a list of {from, e}). What an event is ABOUT is said by the event itself, so that the hub
@@ -43,6 +50,7 @@ held by nobody once its holder leaves, goes silent or releases it.
 import collections
 import json
 import re
+import secrets
 import threading
 import time
 
@@ -53,6 +61,7 @@ MAX_KEPT = 2_000_000  # bytes (as JSON) of one kept event, at most
 MAX_OWNED = 16        # owned things per connection
 OWN_RATE = 20         # changes of owned things a connection may make in a second
 MAX_TOKENS = 512
+RESUME_HOLD = 10.0    # s: how long a player whose connection went keeps its place
 RELEASE_HOLD = 5.0    # s: a page that gave a body up is not handed it again for this long
 SILENT = 2.5          # s: a holder that said nothing for this long (pings come 4 times a second) loses its tokens. Not 1 s: a page
                       # that is not in front has its timers slowed to once a second (measured on the Quest Browser, 2026-10-15)
@@ -119,13 +128,14 @@ def _num(v):
 
 
 class Hub:
-    def __init__(self, build_fn, now_fn=time.monotonic, max_peers=4, bodies=(), owned=None, silent=SILENT, log=None):
-        self.build_fn, self.now, self.max_peers, self.silent = build_fn, now_fn, max_peers, silent
+    def __init__(self, build_fn, now_fn=time.monotonic, max_peers=4, bodies=(), owned=None, silent=SILENT, log=None, resume_hold=RESUME_HOLD):
+        self.build_fn, self.now, self.max_peers, self.silent, self.resume_hold = build_fn, now_fn, max_peers, silent, resume_hold
         self.log = log or (lambda kind, text: None)
         self.lock = threading.RLock()
         self.bodies = tuple(bodies)
         self.owned = {int(t): str(b) for t, b in (owned or {}).items()}       # packet type -> the token whose holder alone may send it
-        self.peers = {}                     # slot -> { text, bin, name, order, last, conn, kill }
+        self.peers = {}                     # slot -> { text, bin, name, order, last, conn, kill, key }
+        self.parked = {}                    # slot -> { name, order, key, at }: players whose connection went, who may come back
         self.viewers = {}                   # id -> { text, bin, name, last, conn, kill }
         self.tokens = {b: None for b in self.bodies}
         self.busy = {b: False for b in self.bodies}
@@ -193,7 +203,8 @@ class Hub:
         return "viewer %d" % (who - VIEWER_BASE + 1) if who >= VIEWER_BASE else "player %d" % (who + 1)
 
     def _hello_common(self):
-        return {"peers": [{"slot": s, "name": p["name"]} for s, p in sorted(self.peers.items())], "tokens": dict(self.tokens), "n": self.n,
+        everyone = sorted(list(self.peers.items()) + list(self.parked.items()))
+        return {"peers": [{"slot": s, "name": p["name"]} for s, p in everyone], "tokens": dict(self.tokens), "n": self.n,
                 "doc": [{"from": d["from"], "e": d["e"]} for d in self.doc.values()], "clocks": {str(s): o for s, o in self.clock_off.items()},
                 "viewers": len(self.viewers)}
 
@@ -290,7 +301,13 @@ class Hub:
             why = None if same else "version"
             if why is None and role not in ("player", "viewer"):
                 why = "role"
-            if why is None and role == "player" and len(self.peers) >= self.max_peers:
+            res = msg.get("resume") if role == "player" else None
+            back = None
+            if isinstance(res, dict) and isinstance(res.get("slot"), int) and isinstance(res.get("key"), str):
+                q = self.parked.get(res["slot"]) or self.peers.get(res["slot"])
+                if q is not None and q.get("key") == res["key"]:
+                    back = res["slot"]
+            if why is None and role == "player" and back is None and len(self.peers) + len(self.parked) >= self.max_peers:
                 why = "full"
             if why is None and role == "viewer" and len(self.viewers) >= MAX_VIEWERS:
                 why = "full"
@@ -306,12 +323,34 @@ class Hub:
                 who = next(VIEWER_BASE + i for i in range(MAX_VIEWERS) if VIEWER_BASE + i not in self.viewers)
                 self.viewers[who] = {"text": send_text, "bin": send_bin, "name": name or "viewer", "last": self.now(), "conn": conn, "kill": kill}
                 self._text(who, dict(self._hello_common(), t="hello", role="viewer", slot=who), dead)
+            elif back is not None:
+                who = back
+                old = self.peers.pop(who, None) or self.parked.pop(who)
+                self.parked.pop(who, None)
+                if old.get("kill"):
+                    try:
+                        old["kill"]()                           # (the old connection is still open on this side: it is closed, its leave is ignored)
+                    except Exception:           # noqa: BLE001
+                        pass
+                self.peers[who] = {"text": send_text, "bin": send_bin, "name": old["name"], "order": old["order"], "last": self.now(),
+                                   "conn": conn, "kill": kill, "key": old["key"]}
+                self.log("ws", "%s came back (its place was kept)" % self.label(who))
+                given = [body for body in self.bodies if self.tokens[body] is None]
+                for body in given:
+                    self.tokens[body] = who
+                    self.busy[body] = False
+                hello = dict(self._hello_common(), t="hello", role="player", slot=who, key=old["key"], resumed=True)
+                hello["peers"] = [q for q in hello["peers"] if q["slot"] != who]
+                self._text(who, hello, dead)
+                for body in given:
+                    self._all({"t": "token", "body": body, "slot": who}, dead, but=who)
             else:
-                who = next(s for s in range(self.max_peers) if s not in self.peers)
-                hello = dict(self._hello_common(), t="hello", role="player", slot=who)
+                who = next(s for s in range(self.max_peers) if s not in self.peers and s not in self.parked)
+                key = secrets.token_hex(8)
+                hello = dict(self._hello_common(), t="hello", role="player", slot=who, key=key)
                 self._order += 1
                 self.peers[who] = {"text": send_text, "bin": send_bin, "name": name or "player %d" % (who + 1), "order": self._order,
-                                   "last": self.now(), "conn": conn, "kill": kill}
+                                   "last": self.now(), "conn": conn, "kill": kill, "key": key}
                 given = [body for body in self.bodies if self.tokens[body] is None]
                 for body in given:
                     self.tokens[body] = who
@@ -348,12 +387,20 @@ class Hub:
             p = self.peers.pop(who, None)
             if not p:
                 return
-            self._forget(who, dead)
-            self._all({"t": "peer", "slot": who, "name": p["name"], "on": False}, dead)
-            for body in list(self.tokens):
+            for body in list(self.tokens):                  # (nothing waits for it: its tokens go at once)
                 if self.tokens[body] == who:
                     self._give(body, self._earliest() if body in self.bodies else None, dead)
+            if self.resume_hold > 0 and not p.get("bye"):
+                self.parked[who] = {"name": p["name"], "order": p["order"], "key": p.get("key"), "at": self.now()}
+                self.log("ws", "%s: its place is kept for %.0f s (it may come back)" % (self.label(who), self.resume_hold))
+            else:
+                self._gone(who, p["name"], dead)
             self._bury(dead)
+
+    def _gone(self, who, name, dead):
+        """A player is gone for good: what was its own goes, and everyone is told."""
+        self._forget(who, dead)
+        self._all({"t": "peer", "slot": who, "name": name, "on": False}, dead)
 
     # ---- what a connection says
     def text(self, who, msg, conn=None):
@@ -402,6 +449,8 @@ class Hub:
                         heir = min(heirs, key=lambda s: self.peers[s]["order"], default=None)
                         if heir is not None:
                             self._give(body, heir, dead)
+            elif t == "bye":
+                p["bye"] = True
             elif t == "clock":
                 if _num(msg.get("off")):
                     self.clock_off[who] = float(msg["off"])
@@ -434,9 +483,15 @@ class Hub:
     def tick(self):
         """Call a few times a second: a holder that went silent while someone else is alive loses its tokens."""
         with self.lock:
-            if len(self.peers) < 2:
-                return
             now, dead = self.now(), set()
+            for who, q in list(self.parked.items()):
+                if now - q["at"] > self.resume_hold:
+                    del self.parked[who]
+                    self.log("ws", "%s did not come back: gone" % self.label(who))
+                    self._gone(who, q["name"], dead)
+            if len(self.peers) < 2:
+                self._bury(dead)
+                return
             for body, holder in list(self.tokens.items()):
                 if holder is None or holder not in self.peers or now - self.peers[holder]["last"] <= self.silent:
                     continue

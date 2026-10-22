@@ -11,7 +11,10 @@
   const BACKLOG = 16384;       // bytes waiting to go out: beyond that, motion is dropped instead of queued
 
   // url: ws(s)://host/ws. opts: { build (a number, or a function that returns it), name, join (more fields for the join message:
-  // { role: 'viewer' }), WebSocket (for tests), now, pingMs, deadMs, retryMs (tests) }
+  // { role: 'viewer' }), WebSocket (for tests), now, pingMs, deadMs, retryMs (tests), store (where the place to come back to is kept:
+  // a Storage; the browser's sessionStorage by default, so that a reload comes back too; null for none) }
+  // Coming back: the hub keeps a player's place for a few seconds after its connection went (server/hub.py). The join after a drop
+  // says { resume: { slot, key } } from the last hello, and gets the same slot back (hello.resumed) when it is in time.
   function connect(url, opts = {}) {
     const WS = opts.WebSocket || globalThis.WebSocket;
     const link = { slot: null, open: false, rtt: null, hello: null, why: '', sent: 0, got: 0, drops: 0, lastClose: null,
@@ -22,6 +25,12 @@
     const now = opts.now || (() => (globalThis.performance ? performance.now() : Date.now()));
     const pingMs = opts.pingMs || PING, deadMs = opts.deadMs || DEAD, retryMs = opts.retryMs || 1000;
     let lastIn = now(), lastTick = now();
+    let store = opts.store;
+    if (store === undefined) { try { store = globalThis.sessionStorage || null; } catch (e) { store = null; } }
+    const KEY = 'mumr.resume';
+    const getResume = () => { try { const v = store && store.getItem(KEY); return v ? JSON.parse(v) : null; } catch (e) { return null; } };
+    const setResume = (v) => { try { if (store) { if (v) store.setItem(KEY, JSON.stringify(v)); else store.removeItem(KEY); } } catch (e) { /* not kept */ } };
+    let resume = getResume();
     const note = (what) => { if (link.onNote) { try { link.onNote(what); } catch (e) { /* a note is not worth a crash */ } } };
     const hold = (t) => { if (t && t.unref) t.unref(); return t; };       // (Node: a timer must not keep a test alive)
 
@@ -32,15 +41,20 @@
       mine.binaryType = 'arraybuffer';
       lastIn = now();
       note('connecting');
-      mine.onopen = () => { if (mine === ws) note('open, joining'); if (mine === ws) mine.send(JSON.stringify(Object.assign({ t: 'join', build: typeof opts.build === 'function' ? opts.build() : opts.build, name: opts.name || '' }, opts.join || {}))); };
+      mine.onopen = () => { if (mine === ws) note('open, joining'); if (mine === ws) mine.send(JSON.stringify(Object.assign({ t: 'join', build: typeof opts.build === 'function' ? opts.build() : opts.build, name: opts.name || '' }, opts.join || {}, resume ? { resume } : {}))); };
       mine.onmessage = (e) => {
         if (mine !== ws) return;
         link.got++; lastIn = now();
         if (typeof e.data !== 'string') { if (link.onBin) link.onBin(e.data); return; }
         let m; try { m = JSON.parse(e.data); } catch (err) { return; }
         if (!m || typeof m !== 'object') return;
-        if (m.t === 'hello') { link.slot = m.slot; link.open = true; link.hello = m; link.why = ''; tries = 0; note(m.role === 'viewer' ? 'in, as a viewer' : `in, player ${m.slot + 1}`); if (link.onOpen) link.onOpen(m); }
-        else if (m.t === 'refused') { link.why = String(m.why || 'refused'); closed = true; note(`refused: ${link.why}`); }       // another version, or full: coming back would not help
+        if (m.t === 'hello') {
+          link.slot = m.slot; link.open = true; link.hello = m; link.why = ''; tries = 0; link.resumed = !!m.resumed;
+          if (m.role === 'player' && typeof m.key === 'string') { resume = { slot: m.slot, key: m.key }; setResume(resume); }
+          note(m.role === 'viewer' ? 'in, as a viewer' : `in, player ${m.slot + 1}${m.resumed ? ' (came back to its place)' : ''}`);
+          if (link.onOpen) link.onOpen(m);
+        }
+        else if (m.t === 'refused') { link.why = String(m.why || 'refused'); closed = true; resume = null; setResume(null); note(`refused: ${link.why}`); }       // another version, or full: coming back would not help
         else if (m.t === 'pong') {
           if (Number.isFinite(m.c)) {
             const rtt = Math.max(0, now() - m.c);
@@ -85,7 +99,11 @@
       ws.send(bytes); link.sent++;
       return true;
     };
+    // (tests: the connection drops as a lost Wi-Fi would make it, and the link comes back by itself)
+    link.drop = () => { const w = ws; if (w) { try { w.close(); } catch (e) { /* already gone */ } } };
     link.close = () => {
+      resume = null; setResume(null);
+      if (link.open && ws && ws.readyState === 1) { try { ws.send(JSON.stringify({ t: 'bye' })); } catch (e) { /* going anyway */ } }
       closed = true;
       if (pingT) clearInterval(pingT);
       if (retryT) clearTimeout(retryT);

@@ -95,3 +95,17 @@ test('the engine and the app are served side by side', async () => {
   assert.deepStrictEqual([r1.status, r2.status, await r2.text()], [200, 200, '<p>test</p>']);
   assert.ok((await r1.text()).includes('class Session'));
 });
+
+test('a player whose connection drops comes back to its place; the other never sees it leave', async () => {
+  const a = player('A'), b = player('B');
+  await until('both in', () => a.connected && b.connected);
+  const slot = a.me, peerEvents = [];
+  b.on('peer', (s, on) => peerEvents.push([s, on]));
+  a.link.drop();
+  await until('A back', () => a.link.open && a.link.resumed, 6000);
+  assert.strictEqual(a.me, slot);
+  await sleep(100);
+  assert.deepStrictEqual(peerEvents, [], 'B was not told A left');
+  assert.ok(b.peers.has(slot));
+  a.link.close(); b.link.close();
+});

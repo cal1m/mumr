@@ -96,6 +96,13 @@ their first claim and fall to nobody when the holder leaves. A holder that says 
 tokens (a page that is not in front ticks once a second). `busy` (a hand is on it) blocks claims; the toucher never waits for the network:
 it simulates locally with everybody's hands from the frame it touches, and the holder's state corrects small differences afterwards.
 
+## 6b. Coming back after a drop
+
+A player's hello carries a `key`. When its connection goes (a Wi-Fi stall: the page gives up after 4 s; a reload), the hub keeps its
+place for 10 s: the slot, its settings, line-up and owned things stay and the others are not told it left; only its tokens go to others
+at once. The link rejoins with `{ resume: { slot, key } }` and gets the same slot back (`hello.resumed`), also while the hub still holds
+the old connection (that one is closed). A page that closes on purpose sends `bye` and is gone at once.
+
 ## 7. Invariants
 
 1. Everything in the world is shared: every player sees it and can interact with it; every PC viewer sees it.
