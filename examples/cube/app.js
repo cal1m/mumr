@@ -18,7 +18,7 @@ const app = await createApp({
   menu: C.menu,
   bodies: ({ space }) => [{ token: 'cube', type: 'cube', adapter: C.adapter(cube, space) }],
   setup: ({ world }) => world.add(cubeMesh, cubeMesh.userData.holder),
-  step: (dt, t, hands) => cube.step(dt, t, hands),
+  step: (dt, t, hands) => { cube.room = app.room.local(); cube.step(dt, t, hands); },
   // the ghost fingers: holding the cube, touching it, or neither
   ghostColour: (id, own) => (cube.held && cube.held.by === id ? GHOST_COLOURS.hold : cube.nearest(own.filter((s) => s.id === id)) < 0.01 ? GHOST_COLOURS.touch : GHOST_COLOURS.idle),
   // the cube's one action: put it half a metre in front of the menu's owner

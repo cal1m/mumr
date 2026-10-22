@@ -9,7 +9,8 @@
 //
 // The app's host module exports:
 //   session        the Session's options (the same as the pages': game, player, kinds ...)
-//   setup({ M, session, space, presence, life }) -> { bodies: [Body], step(dt (s), t (s), hands), receive(p, nowMs) (optional) }
+//   setup({ M, session, space, presence, room, life }) -> { bodies: [Body], step(dt (s), t (s), hands), receive(p, nowMs) (optional) }
+//   (room: room.js Room; room.local() is the room in the common frame, once a headset has supplied one)
 // `space` is the common frame itself (the host stands in it): positions in and out need no turning.
 const path = require('node:path');
 const M = require('./index.js');
@@ -31,7 +32,8 @@ const app = require(path.resolve(modPath));
   const space = new M.align.Space({ x: 0, y: 0, yaw: 0, z: 0, dist: 0, how: 'host' }, 0);
   session.setLined({ dist: 0, how: 'host' });                      // (the host stands in the common frame: it is lined up by being the frame)
   const presence = new M.presence.Presence(session, space);
-  const world = app.setup({ M, session, space, presence, life: say });
+  const room = new M.room.Room(session, space, { life: say });
+  const world = app.setup({ M, session, space, presence, room, life: say });
   const bodies = world.bodies || [];
   session.on('token', (t, mine) => say(`${t}: ${mine ? 'held by the host' : `held by player ${(session.holder(t) ?? -1) + 1}`}`));
   link.onBin = (b) => {

@@ -71,3 +71,24 @@ export function readInput(xr, frame, space, pinch) {
   }
   return { sources, hands };
 }
+
+// The planes this headset found (plane detection: its room setup), as room.js fromXR takes them -> { planes } on the floor plan, or
+// undefined when nothing changed since the last call (state: one object kept by the page). Read again when a plane changed, and every
+// REREAD ms anyway (a tracking reset moves the planes in the reference space without changing them).
+const REREAD = 2000;
+export function readPlanes(xr, frame, space, state) {
+  const set = frame.detectedPlanes;
+  if (!set) return undefined;
+  let sig = `${set.size}:`;
+  for (const p of set) sig += `${p.lastChangedTime | 0},`;
+  const now = performance.now();
+  if (sig === state.sig && now - (state.at || 0) < REREAD) return undefined;
+  const list = [];
+  for (const p of set) {
+    const pose = frame.getPose(p.planeSpace, xr.refSpace);
+    if (!pose) return undefined;                                     // (not ready: try again in the next frame)
+    list.push({ matrix: pose.transform.matrix, polygon: Array.from(p.polygon || [], (q) => ({ x: q.x, z: q.z })), label: p.semanticLabel || 'other', orientation: p.orientation });
+  }
+  state.sig = sig; state.at = now;
+  return M().room.fromXR(list, space.floorY);
+}

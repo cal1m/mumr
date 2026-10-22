@@ -2,7 +2,8 @@
 // floor and desktop camera; the link, the session, the line-up, the engine's wrist menu, everybody's menus (with the handle under this
 // player's own and the fingertip press), presence with the legs, the ghost fingers, the other players, the anchor keeper; entering and
 // leaving mixed reality; the desktop rehearsal (?name=A&frame=x,y,deg: a pretend line-up, the mouse as a fingertip, Shift a pinch, a click
-// on any menu presses it); giving bodies up while nobody looks at the page; the status line and reloading on a new build.
+// on any menu presses it, ?room=demo a pretend room scan); the room (room.js: the first headset's scan, shared; drawn as outlines on the
+// desktop and while lining up); giving bodies up while nobody looks at the page; the status line and reloading on a new build.
 //
 //   const app = await createApp({ THREE, OrbitControls,
 //     session: { game, player, actions, press },        the app's settings and buttons (the engine adds its own)
@@ -15,13 +16,15 @@
 //     ghostColour(id, own) -> colour,                    (optional) this page's ghost fingers' colour for hand `id`
 //     status() -> text,                                  (optional) the app's part of the status line
 //     anchorKey, name })                                 (optional) where the anchor is kept; who this page is in the log
-//   app: { THREE, scene, world, camera, S, space, presence, menus, lineup, sys, life, say, head(), xr(), bodies, ownerText(slot) }
+//   app: { THREE, scene, world, camera, S, space, presence, menus, lineup, sys, room, life, say, head(), xr(), bodies, ownerText(slot) }
+//   (app.room.local(): the room in this page's floor plan, for the app's physics: room.js support / pushOut)
 // The page needs the elements #view (canvas), #enter, #xrNote, #say, #status.
 import { enterXR } from './session.js';
-import { readInput, readLegs } from './input.js';
+import { readInput, readLegs, readPlanes } from './input.js';
 import { makeGhost, GHOST_COLOURS } from './ghost.js';
 import { createPlayers, PLAYER_COLOURS } from './players3d.js';
 import { makePanels } from './panel3d.js';
+import { createRoom3d } from './room3d.js';
 
 export { GHOST_COLOURS, PLAYER_COLOURS };
 const HOST = 15, MENU_W = 0.42;
@@ -49,6 +52,7 @@ export async function createApp(o) {
   for (const g of Object.values(ghosts)) scene.add(g.mesh);
   const players = createPlayers({ THREE, world, scene, GhostHand });
   const { Panel } = makePanels(THREE, renderer);
+  const room3d = createRoom3d({ THREE, parent: world });
   const mouseDot = new THREE.Mesh(new THREE.SphereGeometry(0.012, 12, 8), new THREE.MeshBasicMaterial({ color: 0xf2c14e })); mouseDot.visible = false; world.add(mouseDot);
 
   // ---- the shared world
@@ -66,12 +70,13 @@ export async function createApp(o) {
   const presence = new M.presence.Presence(S, space);
   const menus = new M.menus.Menus(S, space, { known: (id) => id === 'main' || id === 'wrist' });
   const lineup = new M.lineup.LineUp(S, space, { store: LS, say, life });
+  const room = new M.room.Room(S, space, { life, say });
   let xr = null, keeper = null;
   const sys = new SysMenu(S, lineup, {
     exit: () => { if (xr) xr.session.end(); else say('Not in mixed reality'); },
-    roomSetup: () => { const r = xr ? xr.roomSetup() : 'none'; say(r === 'started' ? 'Room setup: the headset takes over' : r === 'used' ? 'Room setup was used once: leave mixed reality and come back for it again' : 'No room setup here'); },
+    roomSetup: () => { const r = xr ? xr.roomSetup() : 'none'; if (r === 'started') room.take(); say(r === 'started' ? 'Room setup: the headset takes over' : r === 'used' ? 'Room setup was used once: leave mixed reality and come back for it again' : 'No room setup here'); },
     roomUsed: () => !!(xr && xr.roomUsed),
-    life,
+    room, life,
   });
   const bodies = (typeof o.bodies === 'function' ? o.bodies({ S, space, say, life }) : o.bodies || []).map((b) => new M.body.Body(S, b));
   const pinch = new M.hands.Pinch(), poke = new M.menus.Poke(), follower = new M.follow.Follower();
@@ -107,6 +112,13 @@ export async function createApp(o) {
     lineup.given({ x: x || 0, y: y || 0, yaw: ((deg || 0) * Math.PI) / 180 });
     life(`pretend line-up ${QS.get('frame')}`);
   }
+  // a pretend room scan for the desktop rehearsal: a floor, a table and two walls in this tab's floor plan
+  if (QS.get('room') === 'demo') room.setScan({ planes: [
+    { l: 'floor', v: false, p: [[-1, -1.5, 0], [3, -1.5, 0], [3, 1.6, 0], [-1, 1.6, 0]] },
+    { l: 'table', v: false, p: [[0.9, 0.0, 0.72], [1.7, 0.0, 0.72], [1.7, 0.6, 0.72], [0.9, 0.6, 0.72]] },
+    { l: 'wall', v: true, p: [[-1, 1.6, 0], [3, 1.6, 0], [3, 1.6, 2.4], [-1, 1.6, 2.4]] },
+    { l: 'wall', v: true, p: [[3, -1.5, 0], [3, 1.6, 0], [3, 1.6, 2.4], [3, -1.5, 2.4]] },
+  ] });
 
   // ---- mixed reality
   if (navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSupported('immersive-ar').then((ok) => { $('enter').hidden = !ok; if (!ok) $('xrNote').textContent = 'no mixed reality in this browser: desktop rehearsal'; });
@@ -152,7 +164,7 @@ export async function createApp(o) {
 
   // ---- every frame
   let head = [0, 0, 0, 1.6, 0], redrawAt = 0, drag = null, statusAt = 0;
-  const handPinch = new Map(), v3 = new THREE.Vector3();
+  const handPinch = new Map(), v3 = new THREE.Vector3(), planeState = {};
   function readHead(frame) {
     if (frame && xr) {
       const vp = frame.getViewerPose(xr.refSpace);
@@ -162,7 +174,7 @@ export async function createApp(o) {
     camera.getWorldDirection(v3);
     return [camera.position.x, -camera.position.z, Math.atan2(-v3.z, v3.x), camera.position.y, Math.asin(v3.y)];
   }
-  const app = { THREE, scene, world, camera, renderer, S, space, presence, menus, lineup, sys, life, say, bodies, ownerText, head: () => head, xr: () => xr };
+  const app = { THREE, scene, world, camera, renderer, S, space, presence, menus, lineup, sys, room, life, say, bodies, ownerText, head: () => head, xr: () => xr };
   function onFrame(time, frame) {
     const now = performance.now(), dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
     if (xr) xr.frame = frame || null;
@@ -174,6 +186,8 @@ export async function createApp(o) {
       const r = readInput(xr, frame, space, pinch);
       own = r.sources; handsXR = r.hands; tips = r.hands.map((h) => ({ id: h.id, p: h.tip }));
       legs = readLegs(xr, frame, space);
+      const scan = readPlanes(xr, frame, space, planeState);
+      if (scan !== undefined) room.setScan(scan);
       const ghost = S.stateOf(null).ghost !== false;
       for (const id of ['left', 'right']) {
         const h = r.hands.find((q) => q.id === id && q.jp), g = ghosts[id];
@@ -188,6 +202,7 @@ export async function createApp(o) {
     // lining up, then everything that is shared
     lineup.update(now, dt, M.hands.tips(own, Object.fromEntries(own.map((s) => [s.id, !!s.pinch]))));
     S.tick(now);
+    room.update(now);
     presence.send(now, head, own.concat(legs));
     const all = presence.hands(lineup.active ? [] : own, now);         // (a hand that lines up does not touch anything)
     if (!lineup.active) for (const b of bodies) b.frame(now, own);
@@ -197,6 +212,7 @@ export async function createApp(o) {
     players.update(presence.others(now).map((q) => ({ slot: q.slot, head: q.head, sources: q.sources })), dt);
     players.marks(lineup.marks());
     world.position.y = space.floorY;
+    room3d.set(room.local()); room3d.group.visible = !xr || lineup.active;
     if (o.draw) o.draw(app, now);
     if (!xr) controls.update();
     renderer.render(scene, camera);
@@ -264,10 +280,11 @@ export async function createApp(o) {
     }
     for (const [key, q] of [...panelsAll]) if (!want.has(key)) { q.panel.dispose(); panelsAll.delete(key); }
   }
+  function roomText() { const r = room.info(); return r.from === null ? (r.have ? `${r.n} planes (${S.connected && S.doc.room ? 'kept' : 'own'})` : 'none') : `${r.n} planes from ${r.me ? 'here' : `player ${r.from + 1}`}`; }
   function status(now) {
     statusAt = now;
     $('status').textContent = [
-      `${S.connected ? `player ${S.me + 1} of ${S.others + 1}` : 'alone'}${S.viewers ? `, ${S.viewers} watching` : ''}   ${lineup.note()}   ${o.status ? o.status() : ''}   round trip ${link.rtt ?? '-'} ms`,
+      `${S.connected ? `player ${S.me + 1} of ${S.others + 1}` : 'alone'}${S.viewers ? `, ${S.viewers} watching` : ''}   ${lineup.note()}   room: ${roomText()}   ${o.status ? o.status() : ''}   round trip ${link.rtt ?? '-'} ms`,
       xr ? `xr: ${xr.features.join(', ')}; shared space: ${xr.shared.state}${xr.shared.uuid ? ` (${xr.shared.uuid})` : ''}; anchor: ${keeper && keeper.anchor ? (keeper.lost ? 'lost' : 'tracked') : 'none'}` : 'desktop: left button = a fingertip on the floor (with Shift: a pinch), right button turns the view, click a menu to press it',
       ...life.lines().slice(-3),
     ].join('\n');

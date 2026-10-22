@@ -5,6 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PLAYER_COLOURS } from '/mumr/xr/players3d.js';
 import { makePanels } from '/mumr/xr/panel3d.js';
 import { makeLegs } from '/mumr/xr/legs3d.js';
+import { createRoom3d } from '/mumr/xr/room3d.js';
 import { makeCube, setCube, ownerOf } from './draw.js';
 
 // DELAY: how far in the past the world is drawn, so that it can be blended between packets (they come every 22 ms); ?delay=ms changes it
@@ -21,6 +22,7 @@ const world = new THREE.Group(); scene.add(world);
 world.add(new THREE.GridHelper(8, 40, 0x55607a, 0x353b4a));
 const cubeMesh = makeCube(THREE, C.SIZE); world.add(cubeMesh, cubeMesh.userData.holder);
 const { Panel } = makePanels(THREE, renderer);
+const room3d = createRoom3d({ THREE, parent: world });     // (the room as the supplier sent it: the common frame is this page's floor plan)
 const toV = (x, y, z) => new THREE.Vector3(x, z, -y);
 
 const info = await fetch('/info').then((r) => r.json()).catch(() => ({ build: 0 }));
@@ -49,6 +51,7 @@ const mtx = new THREE.Matrix4();
 
 function frame() {
   const t = feed.serverNow(), at = t === null ? undefined : t - DELAY, S = feed.session;
+  room3d.set(S.doc.room);
   const c = feed.sample('cube', null, at);
   if (c) setCube(cubeMesh, { x: c.data[0], y: c.data[1], z: c.data[2], yaw: c.data[3], held: c.data[7] > 0.5 }, C.COLOURS[(S.doc.game.colour || 0) % C.COLOURS.length], ownerOf(S.holder('cube'), null, PLAYER_COLOURS));
   const here = new Set();
@@ -91,7 +94,7 @@ function frame() {
   if (dist !== null) spots[1].position.set(dist, 0.002, 0);
   const st = feed.status();
   hud.textContent = `${feed.ready ? 'connected' : 'waiting for the server'}, ${st.players} player(s), drawn ${DELAY} ms in the past (?delay=), event ${st.events}, ${st.packets} packets, clock spread ${st.clockSpreadMs === null ? '-' : st.clockSpreadMs.toFixed(1)} ms\n`
-    + `cube: ${c ? `${c.data[0].toFixed(2)}, ${c.data[1].toFixed(2)} m${c.data[7] > 0.5 ? ', held' : ''}, simulated by ${(ownerOf(S.holder('cube'), null, PLAYER_COLOURS) || { text: 'nobody' }).text}` : 'not seen yet'}   count ${S.doc.game.count ?? 0}`;
+    + `cube: ${c ? `${c.data[0].toFixed(2)}, ${c.data[1].toFixed(2)} m${c.data[7] > 0.5 ? ', held' : ''}, simulated by ${(ownerOf(S.holder('cube'), null, PLAYER_COLOURS) || { text: 'nobody' }).text}` : 'not seen yet'}   count ${S.doc.game.count ?? 0}   room: ${S.doc.room ? `${S.doc.room.planes.length} planes, ${S.doc.roomFrom === null ? 'kept' : `from player ${S.doc.roomFrom + 1}`}` : 'none'}`;
   controls.update();
   renderer.render(scene, camera);
   perf.frames++;

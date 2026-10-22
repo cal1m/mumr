@@ -4,9 +4,9 @@ const C = require('./cube.js');
 
 module.exports = {
   session: { game: C.GAME, player: C.PLAYER, actions: C.ACTIONS, press: C.press },
-  setup({ M, session, space }) {
+  setup({ M, session, space, room }) {
     const cube = new C.Cube();
     const body = new M.body.Body(session, { token: 'cube', type: 'cube', adapter: C.adapter(cube, space) });
-    return { bodies: [body], step: (dt, t, hands) => cube.step(dt, t, hands) };
+    return { bodies: [body], step: (dt, t, hands) => { cube.room = room.local(); cube.step(dt, t, hands); } };
   },
 };

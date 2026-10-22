@@ -2,22 +2,30 @@
 // of the menu are engine-essential ... a wrist based popup that minimizes into a wrist button"). No THREE and no DOM.
 //
 //   folded    a small round button on the wrist ("MUMR"), shown while the inside of the wrist looks at you
-//   open      Line up (and while lining up the three spot rows with Create / Delete / Lock, and Done), Room setup, Exit; "-" folds it;
+//   open      Line up (and while lining up the three spot rows with Create / Delete / Lock, the Room row, and Done), Room setup, Exit;
+//             "-" folds it;
 //             the home menu (Line up, Room setup, Exit) folds by itself once it has been hidden for HIDDEN ms in a row (the hand turned away
 //             from the face, or not tracked; Marek, 2026-10-22). Anything else that is open (lining up) never folds by itself
 // Like every menu it is shared: it goes out in the `M` packet as panel 'wrist' with its state in info.sys, the other players see it on its
 // owner's wrist and may press it, and a press acts for the owner (session.press). The app's own menu is separate (the app's layout).
 //
-//   const sys = new SysMenu(session, lineup, { exit, roomSetup, say })
+//   const sys = new SysMenu(session, lineup, { exit, roomSetup, roomUsed, room, life })     room: room.js Room (its Room row and button)
 //   ACTIONS                  add them to the session's actions; press(id) from the 'action' listener -> true when it was one of ours
 //   info()                   what another page needs to draw this menu: { open, lining, fields, lined, dist, note }
 //   SysMenu.layout(info)     the layout (menus.grid) for anybody's wrist menu; SysMenu.width(info): its width in metres
 //   place(head, jp, floorY)  where it floats this frame (a panel pose), or null while the wrist does not look at you
 (function (M) {
-  const OWN = ['sysOpen', 'sysClose', 'exit', 'roomSetup'];
+  const OWN = ['sysOpen', 'sysClose', 'exit', 'roomSetup', 'supplyRoom'];
   const OPEN_W = 0.22, FOLDED_W = 0.06;
   const HIDDEN = 5000;          // ms hidden in a row before the open home menu folds (Marek: 10 s, then 5)
   const WRIST_SIDE = 'left';
+
+  // the Room row of the line-up menu: whose scan the room is, and the button that makes it this headset's (or stops supplying it)
+  function roomRow(r) {
+    r = r || {};
+    const whose = r.from === null || r.from === undefined ? (r.have ? 'kept, nobody supplies it' : 'no room yet') : r.me ? 'from this headset' : `from player ${r.from + 1}`;
+    return [{ label: 'Room', value: `${whose}${r.n ? `, ${r.n} planes` : ''}`, span: 4, active: !!r.me }, { id: 'supplyRoom', label: r.me ? 'Stop' : 'Supply', value: r.me ? 'supplying' : 'from here', active: !!r.me }];
+  }
 
   class SysMenu {
     constructor(session, lineup, opts = {}) {
@@ -42,13 +50,15 @@
       if (id === 'sysClose') { this.open = false; return true; }
       if (id === 'exit') { if (this.opts.exit) this.opts.exit(); return true; }
       if (id === 'roomSetup') { if (this.opts.roomSetup) this.opts.roomSetup(); return true; }
+      if (id === 'supplyRoom') { if (this.opts.room) this.opts.room.press(id); return true; }
       if (this.lineup && this.lineup.press(id)) { if (id === 'lineUp' && this.lineup.active) this.open = true; return true; }      // (lining up: the fields must be seen)
       return false;
     }
     info() {
       const L = this.lineup, f = L ? L.frame : null;
       return { open: this.open, lining: !!(L && L.active), fields: L && L.active ? L.aligner.fields() : null, lined: !!f,
-        dist: f && f.how !== 'given' ? +(f.dist || 0).toFixed(2) : null, note: L ? L.note() : '', roomUsed: !!this.opts.roomUsed && this.opts.roomUsed() };
+        dist: f && f.how !== 'given' ? +(f.dist || 0).toFixed(2) : null, note: L ? L.note() : '', roomUsed: !!this.opts.roomUsed && this.opts.roomUsed(),
+        room: this.opts.room ? this.opts.room.info() : null };
     }
     static width(info) { return info && info.open ? OPEN_W : FOLDED_W; }
     static layout(info) {
@@ -56,7 +66,7 @@
       if (!info.open) return M.menus.grid({ w: 256, titleH: 0, rowH: 200, rows: [[{ id: 'sysOpen', label: 'MUMR', value: info.lining ? 'lining up' : '', active: !!info.lining }]] });
       if (info.lining) {
         return M.menus.grid({ w: 768, title: 'Line up', note: info.note || '', top: [{ id: 'sysClose', label: '-', w: 80 }, { id: 'lineUp', label: 'Done', active: true, w: 150 }],
-          rows: M.lineup.rowsFrom(info.fields, info.lined) });
+          rows: M.lineup.rowsFrom(info.fields, info.lined).concat([roomRow(info.room)]) });
       }
       return M.menus.grid({ w: 768, title: 'MUMR', note: info.note || '', top: [{ id: 'sysClose', label: '-', w: 80 }],
         rows: [[

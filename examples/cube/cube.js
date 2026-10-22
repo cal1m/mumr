@@ -1,6 +1,7 @@
 // The cube demo's own logic, with no THREE and no DOM (the headset page, the PC view and the Node tests all use it):
 //   * the CUBE: a 12 cm cube on the floor. Every hand pushes it (each fingertip, the palm and every joint), and it is HELD only by a
-//     pinch (index and thumb touching each other) that starts at the cube. It falls when let go, slides and slows on the floor;
+//     pinch (index and thumb touching each other) that starts at the cube. It falls when let go, slides and slows on the floor; with a
+//     room (cube.room: room.js, this page's floor plan) it also rests on tables and stops at walls;
 //   * its BODY adapter (MUMR body.js): the token 'cube' follows touch, the holder sends packet 16;
 //   * the MENU: the app's own (the engine's menu, with Line up, Room setup and Exit, is on the wrist: client/sysmenu.js); the same layout
 //     for this player's menu, another player's menu, and the PC view.
@@ -33,6 +34,8 @@
       this.prev = new Map();                // source id + point -> [x, y, z, t]: for the hands' speed
       this.pinched = new Map();             // source id -> was it pinching in the last step (a hold starts when a pinch starts)
       this.touched = false;
+      this.room = null;                     // the room (room.js local()), or null: the floor only
+      this.ground = HALF;                   // the height of its middle when it rests where it is
     }
     // a point in the cube's own frame (its middle, turned with it)
     local(x, y, z) { const c = Math.cos(this.yaw), s = Math.sin(this.yaw), dx = x - this.x, dy = y - this.y; return [c * dx + s * dy, -s * dx + c * dy, z - this.z]; }
@@ -67,7 +70,8 @@
         if (!this.held && now && !was && this.dist(at[0], at[1], at[2]) < C.grab) this.held = { by: s.id, off: [this.x - at[0], this.y - at[1], this.z - at[2]] };
         if (this.held && this.held.by === s.id) {
           if (!now) { this.held = null; continue; }
-          const o = this.held.off, nx = at[0] + o[0], ny = at[1] + o[1], nz = Math.max(HALF, at[2] + o[2]);
+          const o = this.held.off, w = this._wall(at[0] + o[0], at[1] + o[1], at[2] + o[2]), nx = w ? w.x : at[0] + o[0], ny = w ? w.y : at[1] + o[1];
+          const nz = Math.max(HALF + M.room.support(this.room, nx, ny, at[2] + o[2] - HALF + 0.05), at[2] + o[2]);
           if (dt > 0) { this.vx = (nx - this.x) / dt; this.vy = (ny - this.y) / dt; this.vz = (nz - this.z) / dt; }
           this.x = nx; this.y = ny; this.z = nz; this.touched = true;
         }
@@ -95,17 +99,23 @@
             this.wz += (l[0] * ay - l[1] * ax) * Math.max(0, along) * 6;    // off the middle, it turns
           });
         }
-        // free: it falls, and slides to a stop on the floor
-        if (this.z > HALF || this.vz !== 0) { this.vz -= C.gravity * dt; this.z += this.vz * dt; if (this.z <= HALF) { this.z = HALF; this.vz = this.vz < -0.8 ? -this.vz * 0.2 : 0; } }
+        // free: it falls onto what is under it (the floor, a table), slides to a stop, and stops at a wall
+        const g = HALF + M.room.support(this.room, this.x, this.y, this.z - HALF);
+        if (this.z > g || this.vz !== 0) { this.vz -= C.gravity * dt; this.z += this.vz * dt; if (this.z <= g) { this.z = g; this.vz = this.vz < -0.8 ? -this.vz * 0.2 : 0; } }
         this.x += this.vx * dt; this.y += this.vy * dt; this.yaw = M.util.wrap(this.yaw + this.wz * dt);
-        if (this.z <= HALF + 1e-4) { const k = Math.exp(-C.friction * dt); this.vx *= k; this.vy *= k; this.wz *= k; if (Math.hypot(this.vx, this.vy) < 0.003) { this.vx = 0; this.vy = 0; } if (Math.abs(this.wz) < 0.01) this.wz = 0; }
+        const w = this._wall(this.x, this.y, this.z);
+        if (w) { this.x = w.x; this.y = w.y; const into = this.vx * w.nx + this.vy * w.ny; if (into < 0) { this.vx -= 1.3 * into * w.nx; this.vy -= 1.3 * into * w.ny; } }
+        this.ground = g;
+        if (this.z <= g + 1e-4) { const k = Math.exp(-C.friction * dt); this.vx *= k; this.vy *= k; this.wz *= k; if (Math.hypot(this.vx, this.vy) < 0.003) { this.vx = 0; this.vy = 0; } if (Math.abs(this.wz) < 0.01) this.wz = 0; }
       }
       if (Math.hypot(this.x, this.y) > 8) this.place(0.5, 0);             // (it went too far: back near the middle)
       const k = Math.exp(-C.smooth * dt);
       this.off.x *= k; this.off.y *= k; this.off.z *= k; this.off.yaw *= k;
     }
+    // kept out of the walls (the cube as a round thing a little wider than its half)
+    _wall(x, y, z) { return this.room ? M.room.pushOut(this.room, x, y, z - HALF, z + HALF, HALF * 1.2) : null; }
     place(x, y) { this.x = x; this.y = y; this.z = HALF; this.vx = this.vy = this.vz = this.wz = 0; this.held = null; }
-    moving() { return !!this.held || Math.hypot(this.vx, this.vy, this.vz) > 0.002 || Math.abs(this.wz) > 0.01 || this.z > HALF + 1e-3; }
+    moving() { return !!this.held || Math.hypot(this.vx, this.vy, this.vz) > 0.002 || Math.abs(this.wz) > 0.01 || this.z > this.ground + 1e-3; }
     drawn() { return { x: this.x + this.off.x, y: this.y + this.off.y, z: this.z + this.off.z, yaw: this.yaw + this.off.yaw, held: !!this.held }; }
   }
 

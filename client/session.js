@@ -14,6 +14,8 @@
 //   frame    who is lined up and how far apart their two spots are (align.js)               { k:'frame', slot, line }
 //   check    each player's check mark (the third spot), in the common frame                 { k:'check', slot, x, y, z }
 //   do       a request to whoever holds a token (put the loco here, drop a ball)            { k:'do', token, what, args }
+//   room     the room's scan in the common frame (room.js); it stays when its supplier goes { k:'room', data }
+//   roomFrom who supplies the room now (its slot); forgotten when that player leaves        { k:'roomFrom', slot } (slot null: nobody)
 //
 // A button belongs to a menu, and a menu to its owner: press(owner, id) by anyone goes to the owner's page, which works out what it
 // changes there (opts.press), or, for an action of that headset (opts.actions: leave, room setup ...), tells the app ('action').
@@ -78,6 +80,14 @@
     do: {
       apply(S, e, from) { if (typeof e.token === 'string' && S.holds(e.token)) S.notify('do', e.token, e.what, e.args, from); },
     },
+    room: {
+      keep: () => ({ key: 'room' }),
+      apply(S, e, from) { if (!e.data || typeof e.data !== 'object') return; S.doc.room = e.data; S.notify('room', e.data, from); },
+    },
+    roomFrom: {
+      keep: (e) => ({ key: 'roomFrom', scope: 'slot', drop: !Number.isInteger(e.slot) }),
+      apply(S, e) { const prev = S.doc.roomFrom; S.doc.roomFrom = Number.isInteger(e.slot) ? e.slot : null; if (prev !== S.doc.roomFrom) S.notify('roomFrom', S.doc.roomFrom, prev); },
+    },
   };
 
   class Session {
@@ -117,7 +127,7 @@
       }
     }
     _fresh() {
-      const d = { game: {}, players: {}, lined: {}, checks: {} };
+      const d = { game: {}, players: {}, lined: {}, checks: {}, room: null, roomFrom: null };
       if (this.opts.init) this.opts.init(d);
       return d;
     }
@@ -275,6 +285,7 @@
       for (const [k, v] of this._pend.player) this.mine[k] = v;
       this._pend.game.clear(); this._pend.player.clear();
       this.peers.clear(); this.clocks.clear(); this.doc.players = {}; this.doc.lined = {}; this.doc.checks = {};
+      if (this.doc.roomFrom !== null) this.doc.roomFrom = null;           // (nobody supplies the room now: it stays as it was)
       for (const slot of gone) this.notify('peer', slot, false);
       for (const t of before) this.notify('token', t, true, null);      // alone again: it is all ours
       this.notify('leave', why);
@@ -282,6 +293,7 @@
     _gonePlayer(slot) {
       this.peers.delete(slot); this.clocks.delete(slot);
       delete this.doc.players[slot]; delete this.doc.lined[slot]; delete this.doc.checks[slot];
+      if (this.doc.roomFrom === slot) { this.doc.roomFrom = null; this.notify('roomFrom', null, slot); }      // (the hub forgot it quietly too)
     }
     _text(m) {
       if (!m || typeof m !== 'object') return;

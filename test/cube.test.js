@@ -86,7 +86,7 @@ test('the cube menu has only the cube’s items; the engine items are on the wri
   const ids = (l) => l.buttons.filter((q) => q.id).map((q) => q.id);
   assert.deepStrictEqual(ids(SM.layout({ open: false })), ['sysOpen'], 'folded: one wrist button');
   assert.deepStrictEqual(ids(SM.layout({ open: true, lined: true, dist: 3.34 })), ['sysClose', 'lineUp', 'roomSetup', 'exit']);
-  assert.deepStrictEqual(ids(SM.layout({ open: true, lining: true, fields: [{ placed: true }, {}, {}] })), ['sysClose', 'lineUp', 'p1create', 'p1delete', 'p1lock', 'p2create', 'p2delete', 'p2lock', 'p3create', 'p3delete', 'p3lock']);
+  assert.deepStrictEqual(ids(SM.layout({ open: true, lining: true, fields: [{ placed: true }, {}, {}] })), ['sysClose', 'lineUp', 'p1create', 'p1delete', 'p1lock', 'p2create', 'p2delete', 'p2lock', 'p3create', 'p3delete', 'p3lock', 'supplyRoom']);
   assert.ok(SM.width({ open: true }) > SM.width({ open: false }) * 3);
 });
 
