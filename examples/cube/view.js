@@ -7,7 +7,8 @@ import { makePanels } from '/mumr/xr/panel3d.js';
 import { makeLegs } from '/mumr/xr/legs3d.js';
 import { makeCube, setCube } from './draw.js';
 
-const M = window.MUMR, C = window.CUBE, DELAY = 80;
+// DELAY: how far in the past the world is drawn, so that it can be blended between packets (they come every 22 ms); ?delay=ms changes it
+const M = window.MUMR, C = window.CUBE, DELAY = Math.max(0, Math.min(1000, Number(new URLSearchParams(location.search).get('delay') ?? 50)));
 const canvas = document.getElementById('view'), hud = document.getElementById('hud');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(1);                  // (the PC view is a monitor: a sharper picture is not worth the frame rate)
@@ -84,7 +85,7 @@ function frame() {
   spots[0].visible = spots[1].visible = dist !== null;
   if (dist !== null) spots[1].position.set(dist, 0.002, 0);
   const st = feed.status();
-  hud.textContent = `${feed.ready ? 'connected' : 'waiting for the server'}, ${st.players} player(s), event ${st.events}, ${st.packets} packets, clock spread ${st.clockSpreadMs === null ? '-' : st.clockSpreadMs.toFixed(1)} ms\n`
+  hud.textContent = `${feed.ready ? 'connected' : 'waiting for the server'}, ${st.players} player(s), drawn ${DELAY} ms in the past (?delay=), event ${st.events}, ${st.packets} packets, clock spread ${st.clockSpreadMs === null ? '-' : st.clockSpreadMs.toFixed(1)} ms\n`
     + `cube: ${c ? `${c.data[0].toFixed(2)}, ${c.data[1].toFixed(2)} m${c.data[7] > 0.5 ? ', held' : ''}, simulated by player ${(S.holder('cube') ?? -1) + 1}` : 'not seen yet'}   count ${S.doc.game.count ?? 0}`;
   controls.update();
   renderer.render(scene, camera);
@@ -94,7 +95,7 @@ function frame() {
     // every 10 s to the server's log: how fast this page draws, how much comes in, and how old the newest is (the first headset run found
     // this view "super laggy" in Firefox, and the server had to drop packets for it)
     const ages = Object.entries(st.ages).map(([k, v]) => `${k} ${v.map((q) => q[1]).join('/')}`).join(', ');
-    life(`view: ${(perf.frames * 1000 / (now - perf.t0)).toFixed(0)} fps, ${((st.packets - perf.p0) * 1000 / (now - perf.t0)).toFixed(0)} packets/s, ages (ms) ${ages}, clock fallbacks ${st.offClock}, clock spread ${st.clockSpreadMs === null ? '-' : st.clockSpreadMs.toFixed(1)} ms`);
+    life(`view: ${(perf.frames * 1000 / (now - perf.t0)).toFixed(0)} fps, ${((st.packets - perf.p0) * 1000 / (now - perf.t0)).toFixed(0)} packets/s, ages (ms) ${ages}, late by their stamps (ms) ${Object.entries(st.late).map(([k, v]) => `${k} ${v}`).join(', ')}, drawn ${DELAY} ms back, clock fallbacks ${st.offClock}, clock spread ${st.clockSpreadMs === null ? '-' : st.clockSpreadMs.toFixed(1)} ms`);
     perf.t0 = now; perf.frames = 0; perf.p0 = st.packets;
   }
 }

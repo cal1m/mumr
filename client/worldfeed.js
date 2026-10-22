@@ -28,6 +28,7 @@
       this.bufs = new Map();              // name -> slot -> [{ t, arrived, clock, data }]
       this.guard = new M.wire.Guard();
       this.counts = { packets: 0, ignored: 0, offClock: 0 };
+      this.late = new Map();               // stream -> the last arrivals' lateness (ms)
       this.session = new M.session.Session(this.link, opts.session || {});
       this.doc = this.session.doc;
       const S = this.session;
@@ -56,6 +57,8 @@
       // came by more than half a second (a wrong offset would show the world up to KEEP late), when it came
       let t = off !== undefined ? p.clock + off : sn !== null ? sn : arrived;
       if (off !== undefined && sn !== null && Math.abs(t - sn) > 500) { t = sn; this.counts.offClock++; }
+      // how late it came by its own time stamp (the network plus any error in the sender's clock estimate): kept per stream, for status()
+      if (off !== undefined && sn !== null) { const L = this.late.get(p.name) || []; L.push(sn - (p.clock + off)); if (L.length > 60) L.shift(); this.late.set(p.name, L); }
       let byName = this.bufs.get(p.name);
       if (!byName) this.bufs.set(p.name, byName = new Map());
       let buf2 = byName.get(p.slot);
@@ -106,7 +109,9 @@
     status() {
       const ages = {};
       for (const [name, byName] of this.bufs) ages[name] = [...byName.keys()].map((s) => [s, Math.round(this.age(name, s))]);
-      return { ready: this.ready, players: this.session.peers.size, events: this.session.n, packets: this.counts.packets, ignored: this.counts.ignored, offClock: this.counts.offClock, clockSpreadMs: this.clockQuality, ages };
+      const late = {};
+      for (const [name, L] of this.late) { const q = L.slice().sort((x, y) => x - y); late[name] = q.length ? Math.round(q[Math.floor(q.length / 2)]) : null; }
+      return { ready: this.ready, players: this.session.peers.size, events: this.session.n, packets: this.counts.packets, ignored: this.counts.ignored, offClock: this.counts.offClock, clockSpreadMs: this.clockQuality, ages, late };
     }
   }
 
