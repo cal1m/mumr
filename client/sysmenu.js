@@ -3,8 +3,8 @@
 //
 //   folded    a small round button on the wrist ("MUMR"), shown while the inside of the wrist looks at you
 //   open      Line up (and while lining up the three spot rows with Create / Delete / Lock, and Done), Room setup, Exit; "-" folds it;
-//             the home menu (Line up, Room setup, Exit) folds by itself when you look away from it: the card leaves the middle of
-//             your view (LOOK) for AWAY ms, or the wrist turns so that it hides. Anything else that is open (lining up) never folds by itself
+//             the home menu (Line up, Room setup, Exit) folds by itself once it has been hidden for HIDDEN ms in a row (the hand turned away
+//             from the face, or not tracked; Marek, 2026-10-22). Anything else that is open (lining up) never folds by itself
 // Like every menu it is shared: it goes out in the `M` packet as panel 'wrist' with its state in info.sys, the other players see it on its
 // owner's wrist and may press it, and a press acts for the owner (session.press). The app's own menu is separate (the app's layout).
 //
@@ -16,21 +16,27 @@
 (function (M) {
   const OWN = ['sysOpen', 'sysClose', 'exit', 'roomSetup'];
   const OPEN_W = 0.22, FOLDED_W = 0.06;
-  const LOOK_ON = Math.cos(30 * Math.PI / 180), LOOK_OFF = Math.cos(38 * Math.PI / 180);      // the card is looked at: within 30 degrees of where
-                                                                                           // the head points (no longer: beyond 38)
-  const AWAY = 500;             // ms looked away before the open home menu folds (a glance aside does not)
+  const HIDDEN = 10000;         // ms hidden in a row before the open home menu folds
   const WRIST_SIDE = 'left';
 
   class SysMenu {
     constructor(session, lineup, opts = {}) {
       this.session = session; this.lineup = lineup; this.opts = opts;
       this.open = false; this.shown = false; this.pose = null;
-      this.now = opts.now || M.util.nowMs; this.awayAt = null; this.lookedAt = false;
+      this.now = opts.now || M.util.nowMs; this.hiddenAt = null;
     }
     static get ACTIONS() { return OWN.concat(M.lineup.ACTIONS); }
     // the open menu is the home menu (nothing else, such as lining up, is open in it): only that one folds by itself
     get home() { return this.open && !(this.lineup && this.lineup.active); }
-    _fold(why) { this.open = false; this.awayAt = null; this.lookedAt = false; if (this.opts.life) this.opts.life(`wrist menu folded: ${why}`); }
+    _fold(why) { this.open = false; this.hiddenAt = null; if (this.opts.life) this.opts.life(`wrist menu folded: ${why}`); }
+    // hidden this frame: the open home menu folds once it has been hidden for HIDDEN ms in a row
+    _hidden(why) {
+      this.shown = false; this.pose = null;
+      if (!this.home) { this.hiddenAt = null; return null; }
+      if (this.hiddenAt === null) this.hiddenAt = this.now();
+      else if (this.now() - this.hiddenAt >= HIDDEN) this._fold(`${why} for ${HIDDEN / 1000} s`);
+      return null;
+    }
     press(id) {
       if (id === 'sysOpen') { this.open = true; return true; }
       if (id === 'sysClose') { this.open = false; return true; }
@@ -64,24 +70,19 @@
     // so that it does not flicker at the edge). head: [x, y, heading, height above the floor, pitch]; jp: that hand's 25 joints
     // in XR space (null: the hand is not tracked). -> a panel pose { x, y, h (XR), q (its orientation in XR space) } or null
     place(head, jp, floorY) {
-      if (!jp || !head) { this.shown = false; if (this.home) this._fold('the hand is not tracked'); return (this.pose = null); }
+      if (!jp || !head) return this._hidden('the hand not tracked');
       const at = (i) => [jp[i * 3], jp[i * 3 + 1], jp[i * 3 + 2]];
       const cp = Math.cos(head[4] || 0), eye = [head[0], head[3] + floorY, -head[1]], fwd = [cp * Math.cos(head[2]), Math.sin(head[4] || 0), -cp * Math.sin(head[2])];
       const c = M.follow.wristCard({ wrist: at(0), index: at(6), middle: at(11), pinky: at(21) }, WRIST_SIDE, eye, fwd);
-      if (!c) { this.shown = false; if (this.home) this._fold('the hand is not tracked'); return (this.pose = null); }
+      if (!c) return this._hidden('the hand not tracked');
       const W = M.follow.WRIST;
       this.shown = c.dist < W.far && c.facing > (this.shown ? W.hide : W.show);
-      if (!this.shown) { if (this.home) this._fold('the wrist turned away'); return (this.pose = null); }
-      // looked at: the card within LOOK of where the head points. The open home menu folds when it has not been looked at for AWAY ms
-      const d = [c.pos[0] - eye[0], c.pos[1] - eye[1], c.pos[2] - eye[2]], dl = Math.hypot(d[0], d[1], d[2]) || 1, look = (d[0] * fwd[0] + d[1] * fwd[1] + d[2] * fwd[2]) / dl;
-      this.lookedAt = look > (this.lookedAt ? LOOK_OFF : LOOK_ON);
-      if (!this.home || this.lookedAt) this.awayAt = null;
-      else if (this.awayAt === null) this.awayAt = this.now();
-      else if (this.now() - this.awayAt >= AWAY) this._fold('looked away');
+      if (!this.shown) return this._hidden('the hand turned away');
+      this.hiddenAt = null;
       const p = c.pos;                                 // (open or folded, the card has its middle at the same point: it opens round the button)
       return (this.pose = { x: p[0], y: -p[2], h: p[1], yaw: 0, pitch: 0, q: M.align.quatFromBasis(c.right, c.up, c.normal) });
     }
   }
 
-  M.sysmenu = { SysMenu, OPEN_W, FOLDED_W, WRIST_SIDE, AWAY };
+  M.sysmenu = { SysMenu, OPEN_W, FOLDED_W, WRIST_SIDE, HIDDEN };
 })(typeof module !== 'undefined' ? (module.exports = require('./ns.js')) : (globalThis.MUMR = globalThis.MUMR || {}));
