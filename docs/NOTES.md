@@ -107,6 +107,11 @@ Each item: what is there now in Nudgy, why it costs, what MUMR does instead. **D
 28. **A reset 0.1 s after the start sent the keeper looking for an anchor it had just made** (the second headset; asking by the
     handle failed: "Anchor creation failed"). An anchor made new in this session less than 10 s ago is kept as the reset moved it.
     **Done**, with a test.
+29. **The room is the server's** (Marek, 2026-10-22, replacing Nudgy's supplier rule that he had first asked to keep): the server
+    keeps the last room it was given and everybody uses it. It is given one only when it has none (the first lined-up headset that
+    connects with a scan uploads its own, once) or when a player presses Upload in the line-up menu's Room row (that headset's scan,
+    once). No supplier, no updates by themselves, nothing happens when a headset leaves. This also removed the per-player "who
+    supplies" thing from the document: `room` is one kept event `{ data, by, at }`. `client/room.js`; tests in `test/room.test.js`.
 
 ## 3. Things that must not be lost (from the Nudgy build)
 

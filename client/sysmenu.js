@@ -20,11 +20,12 @@
   const HIDDEN = 5000;          // ms hidden in a row before the open home menu folds (Marek: 10 s, then 5)
   const WRIST_SIDE = 'left';
 
-  // the Room row of the line-up menu: whose scan the room is, and the button that makes it this headset's (or stops supplying it)
+  // the Room row of the line-up menu: the server's room (who uploaded it, when), and the button that uploads this headset's scan once
   function roomRow(r) {
     r = r || {};
-    const whose = r.from === null || r.from === undefined ? (r.have ? 'kept, nobody supplies it' : 'no room yet') : r.me ? 'from this headset' : `from player ${r.from + 1}`;
-    return [{ label: 'Room', value: `${whose}${r.n ? `, ${r.n} planes` : ''}`, span: 4, active: !!r.me }, { id: 'supplyRoom', label: r.me ? 'Stop' : 'Supply', value: r.me ? 'supplying' : 'from here', active: !!r.me }];
+    const hm = (ms) => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+    const what = r.kept ? `server's: ${r.n} planes${r.by === null || r.by === undefined ? '' : ` from player ${r.by + 1}`}${r.at ? ` at ${hm(r.at)}` : ''}` : r.own ? `none on the server; own scan ${r.own} planes` : 'no room';
+    return [{ label: 'Room', value: what, span: 4, active: !!r.kept }, { id: 'supplyRoom', label: 'Upload', value: r.own ? `my ${r.own} planes` : 'no scan here', off: !r.own }];
   }
 
   class SysMenu {

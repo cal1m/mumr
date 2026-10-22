@@ -2,7 +2,7 @@
 // floor and desktop camera; the link, the session, the line-up, the engine's wrist menu, everybody's menus (with the handle under this
 // player's own and the fingertip press), presence with the legs, the ghost fingers, the other players, the anchor keeper; entering and
 // leaving mixed reality; the desktop rehearsal (?name=A&frame=x,y,deg: a pretend line-up, the mouse as a fingertip, Shift a pinch, a click
-// on any menu presses it, ?room=demo a pretend room scan); the room (room.js: the first headset's scan, shared; drawn as outlines on the
+// on any menu presses it, ?room=demo a pretend room scan); the room (room.js: the server's, uploaded by a headset; drawn as outlines on the
 // desktop and while lining up); giving bodies up while nobody looks at the page; the status line and reloading on a new build.
 //
 //   const app = await createApp({ THREE, OrbitControls,
@@ -74,7 +74,7 @@ export async function createApp(o) {
   let xr = null, keeper = null;
   const sys = new SysMenu(S, lineup, {
     exit: () => { if (xr) xr.session.end(); else say('Not in mixed reality'); },
-    roomSetup: () => { const r = xr ? xr.roomSetup() : 'none'; if (r === 'started') room.take(); say(r === 'started' ? 'Room setup: the headset takes over' : r === 'used' ? 'Room setup was used once: leave mixed reality and come back for it again' : 'No room setup here'); },
+    roomSetup: () => { const r = xr ? xr.roomSetup() : 'none'; say(r === 'started' ? 'Room setup: the headset takes over' : r === 'used' ? 'Room setup was used once: leave mixed reality and come back for it again' : 'No room setup here'); },
     roomUsed: () => !!(xr && xr.roomUsed),
     room, life,
   });
@@ -280,7 +280,7 @@ export async function createApp(o) {
     }
     for (const [key, q] of [...panelsAll]) if (!want.has(key)) { q.panel.dispose(); panelsAll.delete(key); }
   }
-  function roomText() { const r = room.info(); return r.from === null ? (r.have ? `${r.n} planes (${S.connected && S.doc.room ? 'kept' : 'own'})` : 'none') : `${r.n} planes from ${r.me ? 'here' : `player ${r.from + 1}`}`; }
+  function roomText() { const r = room.info(); return r.kept ? `the server's, ${r.n} planes${r.by === null ? '' : ` from player ${r.by + 1}`}` : r.own ? `own scan, ${r.own} planes` : 'none'; }
   function status(now) {
     statusAt = now;
     $('status').textContent = [

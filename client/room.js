@@ -1,25 +1,22 @@
-// THE ROOM: the planes a headset found (its room scan: floor, walls, tables, ...), shared so that every player's world has the same room.
-// No THREE and no DOM.
+// THE ROOM: the planes a headset found (its room scan: floor, walls, tables, ...), kept by the server so that every player's world has the
+// same room. No THREE and no DOM.
 //
-// The room is ONE, Nudgy's rule (2026-10-21): the first headset in supplies it (its own scan) while no room has been supplied; after that it
-// changes hands only when a player says so (the Room button of the line-up menu, 'supplyRoom', acts for the menu's owner) or a room setup
-// is started on a headset (take()). When the supplier goes, nobody supplies it and the last room stays (in the server too); the others
-// keep using it. The supplier sends its scan in the common frame when it starts supplying, when the scan changes and when its line-up
-// moves (at most every SEND_EVERY ms). Alone, or not lined up, a page uses its own scan.
+// The SERVER supplies the room (Marek, 2026-10-22): it keeps the last room it was given and every page uses that one. It is given a room
+// only two ways: when it has none, the first lined-up headset that connects with a scan uploads its own (once); and the Upload button of
+// the line-up menu's Room row ('supplyRoom', acts for the menu's owner) uploads that headset's scan, once, when pressed. Nothing else
+// changes it: not a room setup, not a headset leaving, not a line-up moving. The room goes up in the common frame, so a headset must be
+// lined up to upload. Alone, not lined up, or while the server has no room, a page uses its own scan.
 //
 //   const room = new Room(session, space, { life, say })
 //   setScan(planes)       this headset's own scan, floor plan (fromXR); call it when it may have changed (it compares)
-//   take()                a room setup was started here: this headset's scan is the room from now on
-//   press(id)             'supplyRoom' (ACTIONS) -> true; supplying here starts or stops
-//   update(nowMs)         every frame
+//   press(id)             'supplyRoom' (ACTIONS) -> true; uploads this headset's scan
+//   update(nowMs)         every frame (the one upload to a server that has no room)
 //   local()               the room this page uses, in its floor plan: { planes: [{ l: label, v: vertical?, p: [[x, y, h], ...] }] } or null
-//   info()                for the menus: { from (slot or null), me, have, n }
+//   info()                for the menus: { kept (the server has one), by (who uploaded it), at (when, ms), n (planes), own (planes here) }
 // Planes: l the headset's label ('floor', 'wall', 'table', 'couch', 'door frame', ... or 'other'), v true for an upright plane, p the
 // outline, x, y on the floor plan and h the height above the floor (this headset's, or in the common frame the common floor).
 // For an app's physics: support(room, x, y, top), pushOut(room, x, y, z0, z1, r), walls(room), surfaces(room).
 (function (M) {
-  const SEND_EVERY = 500;       // ms: a scan or a line-up that keeps changing goes out at most this often
-  const CLAIM_EVERY = 1000;     // ms: asking to supply the room again (the answer takes a moment)
   const ACTIONS = ['supplyRoom'];
   const r2 = (v) => Math.round(v * 100) / 100;            // (centimetres are enough for a room)
 
@@ -42,9 +39,10 @@
     constructor(session, space, opts = {}) {
       this.S = session; this.space = space; this.opts = opts;
       this.own = null; this.ownSig = '';
-      this.taken = false; this.noAuto = false;
-      this._sentSig = null; this._sentAt = -1e9; this._claimAt = -1e9; this._cache = { room: null, sig: null, out: null };
-      session.on('roomFrom', (slot, prev) => this._life(`room: supplied by ${slot === null ? 'nobody (the room stays)' : slot === session.me ? 'this headset' : `player ${slot + 1}`}${prev === null || prev === undefined ? '' : ` (was ${prev === session.me ? 'this headset' : `player ${prev + 1}`})`}`));
+      this.tried = false;                     // this connection has had its one look at whether the server needs a room
+      this._cache = { room: null, sig: null, out: null };
+      session.on('join', () => { this.tried = false; });
+      session.on('room', (r) => this._life(`room: the server's room is now ${r.data.planes.length} planes, uploaded by ${r.by === null ? 'a player' : `player ${r.by + 1}`}`));
     }
     static get ACTIONS() { return ACTIONS; }
     _life(t) { if (this.opts.life) this.opts.life(t); }
@@ -56,42 +54,36 @@
       this._life(`room: this headset's scan has ${room ? room.planes.length : 0} planes`);
       return true;
     }
-    take() { this.taken = true; this.noAuto = false; }
-    supplying() { return this.S.connected && this.S.doc.roomFrom === this.S.me; }
+    _upload(why) {
+      const S = this.S, sp = this.space;
+      S.emit({ k: 'room', data: mapRoom(this.own, (p) => sp.toCommon(p)), by: S.me, at: Date.now() });
+      this._life(`room: uploaded this headset's scan (${this.own.planes.length} planes): ${why}`);
+    }
     press(id) {
       if (id !== 'supplyRoom') return false;
       const S = this.S;
-      if (!S.connected) { this._say('Alone: the room is this headset\'s own'); return true; }
-      if (this.supplying()) { this.noAuto = true; S.emit({ k: 'roomFrom', slot: null }); this._say('Nobody supplies the room now: it stays as it is'); }
-      else if (!this.own) this._say('This headset has no room scan to supply');
-      else { this.noAuto = false; this._claimAt = -1e9; this._claim(M.util.nowMs()); this._say('The room comes from this headset now'); }
+      if (!S.connected) this._say('Alone: the room is this headset\'s own');
+      else if (!this.space.ok) this._say('Line up first: the room goes to the server in the common frame');
+      else if (!this.own) this._say('This headset has no room scan (Room setup makes one)');
+      else { this._upload('the Upload button'); this._say('The server has this headset\'s room now'); }
       return true;
     }
-    _claim(now) { if (now - this._claimAt < CLAIM_EVERY) return; this._claimAt = now; this.S.emit({ k: 'roomFrom', slot: this.S.me }); }
-    update(now) {
-      const S = this.S, sp = this.space;
-      if (!S.connected || !sp.ok || S.isViewer) return;
-      const first = S.doc.roomFrom === null && !S.doc.room && !this.noAuto;          // (the first headset in, and nobody switched it off here)
-      if (this.own && (first || this.taken) && S.doc.roomFrom !== S.me) this._claim(now);
-      if (S.doc.roomFrom !== S.me) return;
-      this.taken = false;
-      if (!this.own) return;
-      const f = sp.frame, sig = `${this.ownSig}|${f.x.toFixed(3)},${f.y.toFixed(3)},${f.yaw.toFixed(4)},${(sp.fz || 0).toFixed(3)}`;
-      if (sig === this._sentSig || now - this._sentAt < SEND_EVERY) return;
-      this._sentSig = sig; this._sentAt = now;
-      S.emit({ k: 'room', data: mapRoom(this.own, (p) => sp.toCommon(p)) });
-      this._life(`room: sent (${this.own.planes.length} planes)`);
+    update() {
+      const S = this.S;
+      if (this.tried || !S.connected || S.isViewer || !this.space.ok || !this.own) return;
+      this.tried = true;
+      if (!S.doc.room) this._upload('the server had no room');
     }
     local() {
       const S = this.S, sp = this.space, d = S.doc.room;
-      if (!S.connected || !sp.ok || !d || S.doc.roomFrom === S.me) return this.own;
+      if (!S.connected || !sp.ok || !d) return this.own;
       const f = sp.frame, sig = `${f.x},${f.y},${f.yaw},${sp.fz || 0}`, c = this._cache;
-      if (c.room !== d || c.sig !== sig) { c.room = d; c.sig = sig; c.out = mapRoom(d, (p) => sp.fromCommon(p)); }
+      if (c.room !== d || c.sig !== sig) { c.room = d; c.sig = sig; c.out = mapRoom(d.data, (p) => sp.fromCommon(p)); }
       return c.out;
     }
     info() {
-      const S = this.S, from = S.connected ? S.doc.roomFrom : null, r = this.local();
-      return { from, me: from !== null && from === S.me, have: !!r, n: r ? r.planes.length : 0 };
+      const S = this.S, d = S.connected ? S.doc.room : null;
+      return { kept: !!d, by: d ? d.by : null, at: d ? d.at : null, n: d ? d.data.planes.length : 0, own: this.own ? this.own.planes.length : 0 };
     }
   }
 
@@ -151,5 +143,5 @@
   const walls = (room) => (room ? prep(room).walls : []);
   const surfaces = (room) => (room ? prep(room).tops : []);
 
-  M.room = { Room, ACTIONS, fromXR, mapRoom, support, pushOut, walls, surfaces, SEND_EVERY };
+  M.room = { Room, ACTIONS, fromXR, mapRoom, support, pushOut, walls, surfaces };
 })(typeof module !== 'undefined' ? (module.exports = require('./ns.js')) : (globalThis.MUMR = globalThis.MUMR || {}));

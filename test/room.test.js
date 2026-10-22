@@ -36,7 +36,7 @@ test('support and walls: a table carries what is on it, a door frame and the cei
   assert.strictEqual(M.room.walls(r).length, 1);
 });
 
-test('two headsets: the first lined up supplies the room, the other gets it in its own floor plan; it stays when the supplier goes; the button moves it', () => {
+test('the server supplies the room: the first lined-up headset uploads its scan once, then only the Upload button changes it', () => {
   const hub = new Hub();
   const FA = { x: 0, y: 0, yaw: 0, z: 0 }, FB = { x: 1, y: 0.5, yaw: 0.7, z: 0.02 };
   const mk = (name, frame) => {
@@ -48,30 +48,45 @@ test('two headsets: the first lined up supplies the room, the other gets it in i
   a.S.setLined({ dist: 3 }); b.S.setLined({ dist: 3 }); hub.flush();
   a.R.setScan(scan());
   b.R.setScan({ planes: [{ l: 'floor', v: false, p: [[0, 0, 0], [1, 0, 0], [1, 1, 0]] }] });
-  a.R.update(0); hub.flush();                                   // A is first: it claims
-  b.R.update(0); hub.flush();                                   // (B does not: somebody supplies it already)
-  a.R.update(10); hub.flush();                                  // A sends its scan
-  b.R.update(10); hub.flush();
-  assert.strictEqual(a.S.doc.roomFrom, 0); assert.strictEqual(b.S.doc.roomFrom, 0);
-  assert.deepStrictEqual(b.R.info(), { from: 0, me: false, have: true, n: 4 });
+  a.R.update(0); hub.flush();                                   // A is first: the server has no room, A uploads its scan
+  b.R.update(0); hub.flush();                                   // (B does not: the server has one now)
+  assert.strictEqual(b.S.doc.room.by, a.S.me);
+  assert.deepStrictEqual([b.R.info().kept, b.R.info().n, b.R.info().own], [true, 4, 1]);
   // the table's corner (1, 0) of A's floor plan is the same place in B's: through the common frame
   const corner = b.R.local().planes[0].p[0], c = AL.fromCommon(FB, ...AL.toCommon(FA, 1, 0));
-  near(corner[0], c[0], 0.011); near(corner[1], c[1], 0.011); near(corner[2], 0.7 - 0 + 0.02, 0.011, 'heights: common floor + B\'s');
-  near(M.room.support(b.R.local(), corner[0] + 0.02 * Math.cos(0.7) + 0.02 * Math.cos(0.7 + Math.PI / 2), corner[1] + 0.02 * Math.sin(0.7) + 0.02 * Math.sin(0.7 + Math.PI / 2), 2), 0.72, 0.011, 'B stands things on A\'s table');
-  // A goes: nobody supplies it, the room stays (for B, and for a newcomer)
+  near(corner[0], c[0], 0.011); near(corner[1], c[1], 0.011); near(corner[2], 0.72, 0.011, 'heights: common floor + B\'s');
+  // A's scan changes: nothing goes up by itself (only the button sends a room)
+  a.R.setScan({ planes: scan().planes.slice(0, 2) });
+  for (let t = 1000; t < 5000; t += 1000) { a.R.update(t); hub.flush(); }
+  assert.strictEqual(b.S.doc.room.data.planes.length, 4);
+  // A goes: the server keeps the room, for B and for a newcomer
   hub.leave(0); hub.flush();
-  assert.strictEqual(b.S.doc.roomFrom, null); assert.strictEqual(b.R.info().n, 4);
-  b.R.update(2000); hub.flush();
-  assert.strictEqual(b.S.doc.roomFrom, null, 'not taken over by itself: a room is there');
+  assert.strictEqual(b.R.info().n, 4);
   const c2 = mk('C', FA); hub.flush();
-  assert.strictEqual(c2.S.doc.room.planes.length, 4, 'a newcomer gets the kept room'); assert.strictEqual(c2.S.doc.roomFrom, null);
-  // B presses Supply: its scan is the room now
+  assert.strictEqual(c2.S.doc.room.data.planes.length, 4, 'a newcomer gets the kept room');
+  c2.S.setLined({ dist: 3 }); c2.R.setScan(scan()); c2.R.update(0); hub.flush();
+  assert.strictEqual(c2.S.doc.room.by, 0, 'C does not upload: the server has a room (from A, slot 0)');
+  // B presses Upload (on its own menu, or C presses it on B's): B's scan is the server's room now, once
   assert.strictEqual(b.R.press('supplyRoom'), true); hub.flush();
-  b.R.update(3000); hub.flush();
-  assert.strictEqual(c2.S.doc.roomFrom, b.S.me); assert.strictEqual(c2.S.doc.room.planes.length, 1);
-  // and Stop: nobody supplies it, the room stays as it was
-  b.R.press('supplyRoom'); hub.flush(); b.R.update(4000); hub.flush();
-  assert.strictEqual(c2.S.doc.roomFrom, null); assert.strictEqual(c2.S.doc.room.planes.length, 1);
+  assert.strictEqual(c2.S.doc.room.by, b.S.me); assert.strictEqual(c2.S.doc.room.data.planes.length, 1);
+  b.R.setScan(scan()); for (let t = 0; t < 3000; t += 500) { b.R.update(t); hub.flush(); }
+  assert.strictEqual(c2.S.doc.room.data.planes.length, 1, 'and not again by itself');
+  // not lined up: the button says so and sends nothing
+  const d = mk('D', null); hub.flush(); d.R.setScan(scan()); d.R.press('supplyRoom'); hub.flush();
+  assert.match(d.said.join(' '), /Line up first/); assert.strictEqual(c2.S.doc.room.by, b.S.me);
+});
+
+test('a server that restarted with no room takes the first headset\'s scan again, not an old copy', () => {
+  let hub = new Hub();
+  const S = new M.session.Session(hub.link('A'), {}), sp = new AL.Space({ x: 0, y: 0, yaw: 0, z: 0 }, 0), R = new M.room.Room(S, sp);
+  hub.flush(); S.setLined({ dist: 3 }); R.setScan(scan()); R.update(0); hub.flush();
+  assert.strictEqual(S.doc.room.data.planes.length, 4);
+  R.setScan({ planes: scan().planes.slice(0, 1) });
+  hub.leave(0);                                                 // the server goes away and comes back empty
+  hub = new Hub(); const l = hub.link('A');
+  S.link = l; l.onOpen = (h) => S._hello(h); l.onText = (m) => S._text(m); l.onClose = (w) => S._closed(w);
+  hub.flush(); R.update(0); hub.flush();
+  assert.strictEqual(S.doc.room.data.planes.length, 1);
 });
 
 test('alone, or not lined up, a page uses its own scan; the wrist menu shows the Room row while lining up', () => {
@@ -82,7 +97,7 @@ test('alone, or not lined up, a page uses its own scan; the wrist menu shows the
   sys.press('lineUp');
   const lay = M.sysmenu.SysMenu.layout(sys.info());
   assert.ok(lay.buttons.some((q) => q.id === 'supplyRoom'), 'the Room button');
-  assert.ok(lay.buttons.some((q) => /4 planes/.test(q.value || '')), 'how many planes');
+  assert.ok(lay.buttons.some((q) => /own scan 4 planes/.test(q.value || '')), 'how many planes');
 });
 
 test('the cube rests on a table, falls off its edge and stops at a wall', () => {
