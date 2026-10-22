@@ -1,0 +1,287 @@
+// The page wiring every MUMR app repeats, in one call (an ES module; THREE and OrbitControls are handed in). It makes the renderer, scene,
+// floor and desktop camera; the link, the session, the line-up, the engine's wrist menu, everybody's menus (with the handle under this
+// player's own and the fingertip press), presence with the legs, the ghost fingers, the other players, the anchor keeper; entering and
+// leaving mixed reality; the desktop rehearsal (?name=A&frame=x,y,deg: a pretend line-up, the mouse as a fingertip, Shift a pinch, a click
+// on any menu presses it); giving bodies up while nobody looks at the page; the status line and reloading on a new build.
+//
+//   const app = await createApp({ THREE, OrbitControls,
+//     session: { game, player, actions, press },        the app's settings and buttons (the engine adds its own)
+//     menu: (state, info) => layout,                     the app's floating menu (menus.grid), for this player, the others and the PC view
+//     bodies: ({ S, space, say, life }) => [{ token, type, adapter }],   the app's bodies (body.js); packets of their types reach them
+//     setup(app),                                        (optional) once, before the first frame: the app adds its meshes to app.world
+//     step(dt, t, hands, own),                           the app's simulation, every frame (hands: everybody's; own: this page's)
+//     draw(app, now),                                    the app's drawing, every frame (app.world is the floor: THREE (x, z, -y))
+//     onAction(id, from),                                the app's own action buttons (an action happens at the menu's owner)
+//     ghostColour(id, own) -> colour,                    (optional) this page's ghost fingers' colour for hand `id`
+//     status() -> text,                                  (optional) the app's part of the status line
+//     anchorKey, name })                                 (optional) where the anchor is kept; who this page is in the log
+//   app: { THREE, scene, world, camera, S, space, presence, menus, lineup, sys, life, say, head(), xr(), bodies, ownerText(slot) }
+// The page needs the elements #view (canvas), #enter, #xrNote, #say, #status.
+import { enterXR } from './session.js';
+import { readInput, readLegs } from './input.js';
+import { makeGhost, GHOST_COLOURS } from './ghost.js';
+import { createPlayers, PLAYER_COLOURS } from './players3d.js';
+import { makePanels } from './panel3d.js';
+
+export { GHOST_COLOURS, PLAYER_COLOURS };
+const HOST = 15, MENU_W = 0.42;
+
+export async function createApp(o) {
+  const { THREE, OrbitControls } = o, M = window.MUMR, QS = new URLSearchParams(location.search), $ = (id) => document.getElementById(id);
+  const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent), SysMenu = M.sysmenu.SysMenu;
+  const LS = { getItem: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } }, setItem: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* not kept */ } } };
+
+  // ---- the scene. `world` is the floor: inside it the floor plan (x, y, z) is THREE (x, z, -y).
+  const canvas = $('view');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.xr.enabled = true;
+  const scene = new THREE.Scene(), DESK_BG = new THREE.Color(0x20242c);
+  scene.background = DESK_BG;
+  const camera = new THREE.PerspectiveCamera(60, 1, 0.02, 50);
+  camera.position.set(0.2, 1.7, 2.2);
+  const controls = new OrbitControls(camera, canvas);
+  controls.target.set(0.5, 0.4, 0); controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }; controls.update();
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.6));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(1, 3, 2); scene.add(sun);
+  const world = new THREE.Group(); scene.add(world);
+  const grid = new THREE.GridHelper(6, 30, 0x55607a, 0x353b4a); world.add(grid);
+  const GhostHand = makeGhost(THREE), ghosts = { left: new GhostHand(), right: new GhostHand() };
+  for (const g of Object.values(ghosts)) scene.add(g.mesh);
+  const players = createPlayers({ THREE, world, scene, GhostHand });
+  const { Panel } = makePanels(THREE, renderer);
+  const mouseDot = new THREE.Mesh(new THREE.SphereGeometry(0.012, 12, 8), new THREE.MeshBasicMaterial({ color: 0xf2c14e })); mouseDot.visible = false; world.add(mouseDot);
+
+  // ---- the shared world
+  const info = await fetch('/info').then((r) => r.json()).catch(() => ({ build: 0 }));
+  const NAME = QS.get('name') || o.name || (QUEST ? 'Quest' : 'PC tab');
+  const life = M.life.make({ name: NAME });
+  let sayT = -1e9;
+  const say = (text) => { $('say').textContent = text; sayT = performance.now(); life(`said: ${text}`); };
+  life(`page loaded (${navigator.userAgent.slice(0, 80)})`);
+  const link = M.link.connect(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`, { build: info.build, name: NAME });
+  link.onNote = (n) => life(`link: ${n}`);
+  const sess = o.session || {};
+  const S = new M.session.Session(link, Object.assign({}, sess, { actions: SysMenu.ACTIONS.concat(sess.actions || []) }));
+  const space = new M.align.Space(null, 0);
+  const presence = new M.presence.Presence(S, space);
+  const menus = new M.menus.Menus(S, space, { known: (id) => id === 'main' || id === 'wrist' });
+  const lineup = new M.lineup.LineUp(S, space, { store: LS, say, life });
+  let xr = null, keeper = null;
+  const sys = new SysMenu(S, lineup, {
+    exit: () => { if (xr) xr.session.end(); else say('Not in mixed reality'); },
+    roomSetup: () => { const r = xr ? xr.roomSetup() : 'none'; say(r === 'started' ? 'Room setup: the headset takes over' : r === 'used' ? 'Room setup was used once: leave mixed reality and come back for it again' : 'No room setup here'); },
+    roomUsed: () => !!(xr && xr.roomUsed),
+    life,
+  });
+  const bodies = (typeof o.bodies === 'function' ? o.bodies({ S, space, say, life }) : o.bodies || []).map((b) => new M.body.Body(S, b));
+  const pinch = new M.hands.Pinch(), poke = new M.menus.Poke(), follower = new M.follow.Follower();
+  const isHost = (slot) => { const p = S.peers.get(slot); return slot === HOST || !!(p && p.host); };
+  const ownerText = (slot) => (slot === null || slot === undefined ? 'nobody' : isHost(slot) ? 'host' : slot === S.me ? 'you' : `player ${slot + 1}`);
+  link.onBin = (b) => {
+    const p = M.wire.decode(b), now = performance.now();
+    if (!p) return;
+    if (p.name === 'presence') presence.receive(p, now);
+    else if (p.name === 'menus') menus.receive(p, now);
+    else for (const body of bodies) body.receive(p, now);
+  };
+  S.on('action', (id, from) => { if (!sys.press(id) && o.onAction) o.onAction(id, from); });
+  S.on('press', (id, from) => { if (from !== S.me) say(`Player ${from + 1} pressed ${id} on your menu`); });
+  S.on('peer', (slot, on) => { if (isHost(slot)) { life(`host ${on ? 'here' : 'gone'}`); return; } say(on ? `Player ${slot + 1} is here` : `Player ${slot + 1} left`); life(`peer ${slot + 1} ${on ? 'joined' : 'left'}`); });
+  S.on('token', (t, mine) => { life(`${t}: ${mine ? 'simulated here' : `simulated by ${ownerText(S.holder(t))}`}`); if (mine && document.hidden && !xr) away(); });
+  S.on('leave', (why) => { if (why === 'version') say('This page is older than the server\'s: reload it'); });
+  // a page nobody looks at (a hidden tab, a headset taken off, a frame loop that stopped) draws no frames: it gives its bodies up
+  let awayAt = -1e9, last = performance.now();
+  function away() {
+    const now = performance.now();
+    if (now - awayAt < 5000 || !S.connected || !(S.others || S.hostHere)) return;
+    const held = bodies.filter((b) => S.holds(b.token));
+    if (!held.length) return;
+    awayAt = now;
+    for (const b of held) S.release(b.token);
+    life(`${held.map((b) => b.token).join(', ')}: given up (this page is not looked at)`);
+  }
+  document.addEventListener('visibilitychange', () => { life(`page ${document.visibilityState}`); if (document.hidden && !xr) away(); });
+  setInterval(() => { if (performance.now() - last > 1000) away(); }, 500);
+  if (QS.has('frame')) {
+    const [x, y, deg] = QS.get('frame').split(',').map(Number);
+    lineup.given({ x: x || 0, y: y || 0, yaw: ((deg || 0) * Math.PI) / 180 });
+    life(`pretend line-up ${QS.get('frame')}`);
+  }
+
+  // ---- mixed reality
+  if (navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSupported('immersive-ar').then((ok) => { $('enter').hidden = !ok; if (!ok) $('xrNote').textContent = 'no mixed reality in this browser: desktop rehearsal'; });
+  $('enter').onclick = async () => {
+    try {
+      xr = await enterXR({ renderer, life, onReset: (F) => keeper && keeper.reset(F), onEnd: ended, onVisibility: (v) => { if (v === 'hidden') away(); } });
+    } catch (e) { $('xrNote').textContent = `Could not start mixed reality: ${e && e.message ? e.message : e}`; return; }
+    scene.background = null; grid.visible = false; mouseDot.visible = false;
+    lineup.restart();
+    keeper = new M.anchor.Keeper(xr.anchorIO(o.anchorKey || 'mumr.anchor'));
+    lineup.setKeeper(keeper);
+    follower.pose = null;
+    if (QS.get('shared') === '1') say('Shared space asked for: see the server log');
+  };
+  function ended() { xr = null; keeper = null; lineup.setKeeper(null); lineup.restart(); scene.background = DESK_BG; grid.visible = true; resize(); }
+
+  // ---- the desktop rehearsal: the mouse as a fingertip on the floor (Shift: a pinch), a click on any menu presses it
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hitP = new THREE.Vector3();
+  let mouse = null;
+  const panelsAll = new Map();   // key -> { panel, owner, id, lay, pose }
+  const pointer = (ev) => { const r = canvas.getBoundingClientRect(); ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, camera); };
+  canvas.addEventListener('pointerdown', (ev) => {
+    if (ev.button !== 0 || xr) return;
+    pointer(ev);
+    const hit = ray.intersectObjects([...panelsAll.values()].map((q) => q.panel.plane), false)[0];
+    if (hit) {
+      const q = [...panelsAll.values()].find((v) => v.panel.plane === hit.object), n = M.menus.axes(q.pose).normal;
+      if (ray.ray.direction.x * n[0] + ray.ray.direction.y * n[1] + ray.ray.direction.z * n[2] > 0) return;      // (from behind: a blank wall)
+      const id = M.menus.hit(q.lay, hit.uv.x, 1 - hit.uv.y);
+      if (id) pressed(q.owner, id, [...panelsAll].find(([, v]) => v === q)[0]);
+      return;
+    }
+    if (ray.ray.intersectPlane(floorPlane, hitP)) { mouse = { x: hitP.x, y: -hitP.z, pinch: ev.shiftKey }; canvas.setPointerCapture(ev.pointerId); }
+  });
+  canvas.addEventListener('pointermove', (ev) => { if (!mouse) return; pointer(ev); if (ray.ray.intersectPlane(floorPlane, hitP)) mouse = { x: hitP.x, y: -hitP.z, pinch: ev.shiftKey }; });
+  canvas.addEventListener('pointerup', () => { mouse = null; });
+  canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
+  let pressedLook = { key: null, id: null, t: -1e9 };
+  function pressed(owner, id, key) {
+    pressedLook = { key: key || (owner === null || owner === S.me ? 'own:main' : `${owner}:main`), id, t: performance.now() };
+    S.press(owner === S.me ? null : owner, id);
+  }
+
+  // ---- every frame
+  let head = [0, 0, 0, 1.6, 0], redrawAt = 0, drag = null, statusAt = 0;
+  const handPinch = new Map(), v3 = new THREE.Vector3();
+  function readHead(frame) {
+    if (frame && xr) {
+      const vp = frame.getViewerPose(xr.refSpace);
+      if (vp) { const p = vp.transform.position, q = vp.transform.orientation; const fx = -2 * (q.x * q.z + q.w * q.y), fy = -2 * (q.y * q.z - q.w * q.x), fz = -(1 - 2 * (q.x * q.x + q.y * q.y)); return [p.x, -p.z, Math.atan2(-fz, fx), p.y - space.floorY, Math.asin(Math.max(-1, Math.min(1, fy)))]; }
+      return head;
+    }
+    camera.getWorldDirection(v3);
+    return [camera.position.x, -camera.position.z, Math.atan2(-v3.z, v3.x), camera.position.y, Math.asin(v3.y)];
+  }
+  const app = { THREE, scene, world, camera, renderer, S, space, presence, menus, lineup, sys, life, say, bodies, ownerText, head: () => head, xr: () => xr };
+  function onFrame(time, frame) {
+    const now = performance.now(), dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
+    if (xr) xr.frame = frame || null;
+    if (keeper && frame) keeper.update();
+    head = readHead(frame);
+    // this page's hands: in mixed reality the tracked hands; on the desktop the mouse while its button is down
+    let own = [], tips = [], legs = [], handsXR = [];
+    if (xr && frame) {
+      const r = readInput(xr, frame, space, pinch);
+      own = r.sources; handsXR = r.hands; tips = r.hands.map((h) => ({ id: h.id, p: h.tip }));
+      legs = readLegs(xr, frame, space);
+      const ghost = S.stateOf(null).ghost !== false;
+      for (const id of ['left', 'right']) {
+        const h = r.hands.find((q) => q.id === id && q.jp), g = ghosts[id];
+        if (!h || !ghost) { g.mesh.visible = false; continue; }
+        g.update(h.jp, h.jr, o.ghostColour ? o.ghostColour(id, own) : GHOST_COLOURS.idle);
+      }
+    } else if (mouse) {
+      own = [{ id: 'mouse', pinch: !!mouse.pinch, points: [{ name: 'index', x: mouse.x, y: mouse.y, z: 0.05 }, { name: 'thumb', x: mouse.x, y: mouse.y, z: 0.05 }] }];
+    }
+    mouseDot.visible = !xr && !!mouse;
+    if (mouse) mouseDot.position.set(mouse.x, 0.05, -mouse.y);
+    // lining up, then everything that is shared
+    lineup.update(now, dt, M.hands.tips(own, Object.fromEntries(own.map((s) => [s.id, !!s.pinch]))));
+    S.tick(now);
+    presence.send(now, head, own.concat(legs));
+    const all = presence.hands(lineup.active ? [] : own, now);         // (a hand that lines up does not touch anything)
+    if (!lineup.active) for (const b of bodies) b.frame(now, own);
+    if (o.step) o.step(dt, now / 1000, all, own);
+    for (const b of bodies) b.send(now);
+    menusFrame(now, dt, head, handsXR, tips);
+    players.update(presence.others(now).map((q) => ({ slot: q.slot, head: q.head, sources: q.sources })), dt);
+    players.marks(lineup.marks());
+    world.position.y = space.floorY;
+    if (o.draw) o.draw(app, now);
+    if (!xr) controls.update();
+    renderer.render(scene, camera);
+    if (now - statusAt > 300) status(now);
+  }
+  // the menus: the app's floats (it follows us in mixed reality and has a handle; it stands still on the desktop), the engine's is on the
+  // wrist; everybody's are drawn from their owner's state and can be pressed
+  const otherNote = (slot) => { const q = menus.others(performance.now()).find((m) => m.slot === slot); return q && q.info && q.info.sys ? q.info.sys.note : ''; };
+  function menusFrame(now, dt, hd, handsXR, tips) {
+    const at = { x: hd[0], y: hd[1], th: hd[2], py: hd[3] + space.floorY };
+    if (!follower.pose) { if (xr) follower.snap(at); else follower.set({ x: 0.9, y: 0.55, h: 0.95, yaw: -2.4, pitch: 0.15 }); }
+    const sysInfo = sys.info(), ownInfo = { players: S.others + 1, sys: sysInfo };
+    const want = new Set(['own:main']), busyKeys = new Set();
+    const list = [{ key: 'own:main', owner: null, id: 'main', pose: follower.pose, w: MENU_W, lay: o.menu(S.stateOf(null), ownInfo) }];
+    const leftHand = handsXR.find((h) => h.id === M.sysmenu.WRIST_SIDE && h.jp);
+    const wristPose = xr ? sys.place(hd, leftHand ? leftHand.jp : null, space.floorY) : { x: 0.55, y: 0.85, h: 0.95, yaw: -2.0, pitch: 0.15 };
+    if (wristPose) { want.add('own:wrist'); list.push({ key: 'own:wrist', owner: null, id: 'wrist', pose: wristPose, w: SysMenu.width(sysInfo), lay: SysMenu.layout(sysInfo), ignore: M.sysmenu.WRIST_SIDE }); }
+    for (const q of menus.others(now)) for (const p of q.panels) {
+      const key = `${q.slot}:${p.id}`, oi = q.info || {}, wrist = p.id === 'wrist';
+      const prev = panelsAll.get(key), cur = prev && prev.pose ? prev.pose : p.pose, k = 1 - Math.exp(-dt * 18);
+      const eased = { x: cur.x + (p.pose.x - cur.x) * k, y: cur.y + (p.pose.y - cur.y) * k, h: cur.h + (p.pose.h - cur.h) * k, yaw: cur.yaw + M.util.wrap(p.pose.yaw - cur.yaw) * k, pitch: p.pose.pitch };
+      if (p.pose.q) { const a = cur.q || p.pose.q, b = p.pose.q, d = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3] < 0 ? -1 : 1, m = a.map((v, i) => v + (b[i] * d - v) * k), l = Math.hypot(...m) || 1; eased.q = m.map((v) => v / l); }
+      list.push({ key, owner: q.slot, id: p.id, pose: eased, w: wrist ? SysMenu.width(oi.sys) : MENU_W, lay: wrist ? SysMenu.layout(oi.sys) : o.menu(S.stateOf(q.slot), oi) });
+      want.add(key);
+    }
+    for (const pn of list) pn.h = pn.w * pn.lay.h / pn.lay.w;
+    let hover = null;
+    if (tips.length) {
+      const r = poke.update(list, tips, now);
+      hover = r.hover;
+      for (const key of r.busy) busyKeys.add(key);
+      for (const pr of r.presses) pressed(pr.owner, pr.button, pr.key);
+    }
+    // the handle under our menu: a pinch that starts at it carries the menu; where it is let go is where it stays
+    let handle = 'idle';
+    for (const h of handsXR) {
+      const d = M.menus.handleDist(follower.pose, list[0].h, h.at), was = handPinch.get(h.id) || false;
+      handPinch.set(h.id, h.pinch);
+      if (d < 0.06) { handle = 'near'; busyKeys.add('own:main'); }
+      if (!drag && h.pinch && !was && d < 0.05) { const P = follower.pose; drag = { id: h.id, off: [P.x - h.at[0], P.h - h.at[1], P.y + h.at[2]] }; }
+    }
+    if (drag) {
+      const h = handsXR.find((q) => q.id === drag.id);
+      if (!h || !h.pinch) drag = null;
+      else { follower.place(h.at[0] + drag.off[0], -h.at[2] + drag.off[2], h.at[1] + drag.off[1], at); handle = 'held'; busyKeys.add('own:main'); }
+    }
+    if (xr) follower.update(at, dt, busyKeys.has('own:main'));
+    list[0].pose = follower.pose;
+    menus.send(now, [{ id: 'main', pose: follower.pose }].concat(wristPose ? [{ id: 'wrist', pose: wristPose }] : []), ownInfo);
+    const redraw = now - redrawAt > 100;
+    if (redraw) redrawAt = now;
+    for (const pn of list) {
+      let q = panelsAll.get(pn.key);
+      if (!q) { q = { panel: new Panel(pn.w, pn.lay, { handle: pn.key === 'own:main' }) }; panelsAll.set(pn.key, q); scene.add(q.panel.mesh); }
+      q.panel.setWidth(pn.w);
+      if (pn.key === 'own:main') q.panel.handleLook(handle);
+      Object.assign(q, { owner: pn.owner, id: pn.id, lay: pn.lay, pose: pn.pose });
+      q.panel.pose(pn.pose);
+      if (redraw || pressedLook.key === pn.key) {
+        const sayNote = pn.owner === null && now - sayT < 3000 ? $('say').textContent : undefined;
+        q.panel.draw(pn.lay, { hover: hover && hover.key === pn.key ? hover.button : null, pressed: pressedLook.key === pn.key && now - pressedLook.t < 250 ? pressedLook.id : null,
+          edge: pn.owner === null ? null : PLAYER_COLOURS[pn.owner % PLAYER_COLOURS.length],
+          note: sayNote || (pn.id === 'wrist' ? (pn.owner === null ? lineup.note() : (otherNote(pn.owner) || `player ${pn.owner + 1}`)) : (pn.owner === null ? '' : `player ${pn.owner + 1}`)) });
+      }
+    }
+    for (const [key, q] of [...panelsAll]) if (!want.has(key)) { q.panel.dispose(); panelsAll.delete(key); }
+  }
+  function status(now) {
+    statusAt = now;
+    $('status').textContent = [
+      `${S.connected ? `player ${S.me + 1} of ${S.others + 1}` : 'alone'}${S.viewers ? `, ${S.viewers} watching` : ''}   ${lineup.note()}   ${o.status ? o.status() : ''}   round trip ${link.rtt ?? '-'} ms`,
+      xr ? `xr: ${xr.features.join(', ')}; shared space: ${xr.shared.state}${xr.shared.uuid ? ` (${xr.shared.uuid})` : ''}; anchor: ${keeper && keeper.anchor ? (keeper.lost ? 'lost' : 'tracked') : 'none'}` : 'desktop: left button = a fingertip on the floor (with Shift: a pinch), right button turns the view, click a menu to press it',
+      ...life.lines().slice(-3),
+    ].join('\n');
+  }
+  function resize() {
+    if (xr) return;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
+  }
+  addEventListener('resize', resize); resize();
+  if (o.setup) o.setup(app);
+  renderer.setAnimationLoop(onFrame);
+  // a page of another build reloads itself (outside mixed reality): a headset never runs an old page by accident
+  setInterval(async () => { if (xr) return; try { const i = await (await fetch('/info')).json(); if (i.build && info.build && i.build !== info.build) location.reload(); } catch (e) { /* the server is away */ } }, 3000);
+  window.__mumr = Object.assign(app, { link, panels: panelsAll, controls, frame: () => onFrame(performance.now(), null), press: pressed, poke: (x, y, pinchOn) => { mouse = x === undefined ? null : { x, y, pinch: !!pinchOn }; } });
+  return app;
+}

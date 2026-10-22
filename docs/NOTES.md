@@ -80,7 +80,9 @@ Each item: what is there now in Nudgy, why it costs, what MUMR does instead. **D
 20. **The demo app is longer than the plan's 150 lines** (235 lines plus 155 for the cube). The parts every app writes again: the
     desktop rehearsal (mouse as a fingertip, clicks on panels), keeping a `Panel` per menu in step with `menus.others()`, easing the
     other players' panels, the frame loop's order (input, line-up, presence, bodies, menus, draw). A small `xr/app.js` helper could
-    carry them. Not done: wait for the headset run before deciding what the helper should hold.
+    carry them. **Done** (2026-10-22, after the two-headset runs): `createApp` in `client/xr/app.js` (about 290 lines) holds all of
+    it; the app hands in its settings, its menu layout, its bodies and four hooks (`step`, `draw`, `onAction`, `ghostColour`). The cube
+    page is 34 lines. An app that needs another frame order or a second floating menu does not fit yet: add a hook when one does.
 21. **A menu is a function of its owner's state and info**, for this player's menu, another player's and the PC view alike
     (`cube.menu(state, info)`): one layout, drawn three ways. That is the generic form of Nudgy's M4 rule.
 

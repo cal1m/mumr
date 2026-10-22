@@ -63,7 +63,21 @@ link.onBin = (b) => { const p = MUMR.wire.decode(b); if (p.name === 'presence') 
 
 ## 3b. Menus, lining up, XR
 
-`examples/cube/app.js` is the worked example. The pieces:
+The short way: `createApp` from `/mumr/xr/app.js` does all of this section (and the desktop rehearsal, the status line, giving
+bodies up while nobody looks at the page, reloading on a new build). [`examples/cube/app.js`](../examples/cube/app.js) is the whole
+cube page on it:
+
+```js
+const app = await createApp({ THREE, OrbitControls, anchorKey: 'myapp.anchor',
+  session: { game, player, actions, press },               // the app's own; the engine adds the wrist menu's actions
+  menu: (state, info) => layout,                            // the app's floating menu, for every player
+  bodies: ({ space }) => [{ token: 'ball', type: 'ball', adapter }],
+  setup: ({ world }) => world.add(ballMesh),                // once; `world` is the floor (THREE (x, z, -y))
+  step: (dt, t, hands) => simulate(hands), draw: (app) => drawBall(), onAction: (id, from) => ..., status: () => 'ball: ...' });
+```
+
+The page needs `#view`, `#enter`, `#xrNote`, `#say` and `#status` (copy the cube's `index.html`). What `createApp` wires, piece by
+piece, for an app that needs something else:
 
 - The engine's menu is on the wrist: `new MUMR.sysmenu.SysMenu(session, lineup, { exit, roomSetup, roomUsed })`; add `SysMenu.ACTIONS`
   to the session's `actions` and call `sys.press(id)` first from the `action` listener; draw it at `sys.place(head, leftHandJoints,
