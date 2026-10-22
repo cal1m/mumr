@@ -186,12 +186,13 @@ function onFrame(time, frame) {
   // the menus: ours follows us in mixed reality and stands still on the desktop; everybody's can be pressed
   if (!follower.pose) { if (xr) follower.snap({ x: head[0], y: head[1], th: head[2], py: head[3] + space.floorY }); else follower.set({ x: 0.9, y: 0.55, h: 0.95, yaw: -2.4, pitch: 0.15 }); }
   const st = S.stateOf(null), sysInfo = sys.info(), ownInfo = { players: S.others + 1, sys: sysInfo };
-  const lay = C.menu(st, ownInfo), want = new Set(['own:main', 'own:wrist']);
+  const lay = C.menu(st, ownInfo), want = new Set(['own:main']);
   const busyKeys = new Set();
   const list = [{ key: 'own:main', owner: null, id: 'main', pose: follower.pose, w: 0.42, lay }];
   // the wrist menu: on the left wrist in mixed reality (while it looks at you), beside the cube's menu on the desktop
   const leftHand = handsXR.find((h) => h.id === M.sysmenu.WRIST_SIDE && h.jp);
   const wristPose = xr ? sys.place(head, leftHand ? leftHand.jp : null, space.floorY) : { x: 0.55, y: 0.85, h: 0.95, yaw: -2.0, pitch: 0.15 };
+  if (wristPose) want.add('own:wrist');                // (a card that is not shown is not kept: it must not hang in the air where it last was)
   if (wristPose) list.push({ key: 'own:wrist', owner: null, id: 'wrist', pose: wristPose, w: SysMenu.width(sysInfo), lay: SysMenu.layout(sysInfo), ignore: M.sysmenu.WRIST_SIDE });
   for (const o of menus.others(now)) for (const p of o.panels) {
     const key = `${o.slot}:${p.id}`, oi = o.info || {}, wrist = p.id === 'wrist', olay = wrist ? SysMenu.layout(oi.sys) : C.menu(S.stateOf(o.slot), oi);
