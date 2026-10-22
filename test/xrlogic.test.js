@@ -141,6 +141,20 @@ test('a new anchor: the old saved line-up means nothing; no anchor support: noth
   assert.strictEqual(K2.canSave, false);
 });
 
+test('a reset right after an anchor was made new does not send the keeper looking for it', async () => {
+  const { S, io } = rig();
+  S.stored = null;
+  const K = new M.anchor.Keeper(io);
+  K.update(); await tick(); await tick(); K.update();
+  assert.strictEqual(K.posed, true);
+  K.anchor.stale = Object.assign({}, K.frame);
+  S.O = { x: 0.05, y: 0.6, yaw: -134 * Math.PI / 180 };
+  S.t = 100; K.reset({ x: 0.05, y: 0.61, yaw: -2.3 });
+  for (let t = 200; t < 4000; t += 100) { S.t = t; K.update(); await tick(); }
+  assert.strictEqual(S.restores, 0, S.logs.join(' | '));
+  assert.ok(S.logs.some((l) => /made a moment ago/.test(l)), S.logs.join(' | '));
+});
+
 test('lining up through the server: two spots by resting a fingertip, the check mark, and everybody hears it', () => {
   const hub = new Hub();
   const said = [], acts = [];

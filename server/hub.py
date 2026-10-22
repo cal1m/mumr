@@ -53,6 +53,7 @@ MAX_KEPT = 2_000_000  # bytes (as JSON) of one kept event, at most
 MAX_OWNED = 16        # owned things per connection
 OWN_RATE = 20         # changes of owned things a connection may make in a second
 MAX_TOKENS = 512
+RELEASE_HOLD = 5.0    # s: a page that gave a body up is not handed it again for this long
 SILENT = 2.5          # s: a holder that said nothing for this long (pings come 4 times a second) loses its tokens. Not 1 s: a page
                       # that is not in front has its timers slowed to once a second (measured on the Quest Browser, 2026-10-15)
 _NAME = re.compile(r"[A-Za-z0-9_.:-]{1,40}")
@@ -134,6 +135,7 @@ class Hub:
         self.latest = {}                    # (type, slot) -> the newest motion packet of that kind from that player
         self.clock_off = {}                 # slot -> the page's offset to this clock, ms
         self._own_times = {}                # who -> when its last owned changes were (the rate limit)
+        self._released = {}                 # body -> { who: when it last gave that body up }
 
     # ---- sending. A connection whose send fails is gone: it is taken out once the current round is over.
     def _who(self, who):
@@ -389,8 +391,15 @@ class Hub:
                 if body in self.tokens and self.tokens[body] == who:
                     if body not in self.bodies:
                         self._give(body, None, dead)
-                    else:                                           # (a body always has a holder: the earliest other one, if there is one)
-                        heir = min((s for s in self.peers if s != who), key=lambda s: self.peers[s]["order"], default=None)
+                    else:
+                        # a body always has a holder: the earliest other one that has not given this body up in the last RELEASE_HOLD seconds
+                        # (two pages that nobody looks at would otherwise hand it to each other for ever: first two-headset run, 2026-10-22,
+                        # 4800 hand-overs in 4 minutes); with nobody like that, it stays where it is
+                        now = self.now()
+                        gave = self._released.setdefault(body, {})
+                        gave[who] = now
+                        heirs = [s for s in self.peers if s != who and now - gave.get(s, -1e9) > RELEASE_HOLD]
+                        heir = min(heirs, key=lambda s: self.peers[s]["order"], default=None)
                         if heir is not None:
                             self._give(body, heir, dead)
             elif t == "clock":

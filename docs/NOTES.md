@@ -96,6 +96,13 @@ Each item: what is there now in Nudgy, why it costs, what MUMR does instead. **D
 26. **A Wi-Fi stall of 4 s made the headset reconnect as a new player** (first run, 18:11:27), so its tokens and slot changed. Not
     fixed yet: a resume (the same slot back with the join key, within a few seconds) would keep a player's place.
 
+27. **Two pages that nobody looks at handed the cube to each other for ever** (first two-headset run: about 4800 hand-overs in the
+    4 minutes after both left mixed reality). The hub no longer gives a released body to a player that released the same body in
+    the last 5 s (it stays where it is), and the page releases at most once in 5 s. **Done**, with a test.
+28. **A reset 0.1 s after the start sent the keeper looking for an anchor it had just made** (the second headset; asking by the
+    handle failed: "Anchor creation failed"). An anchor made new in this session less than 10 s ago is kept as the reset moved it.
+    **Done**, with a test.
+
 ## 3. Things that must not be lost (from the Nudgy build)
 
 Kept from the first plan's section 6, plus what came after it:
@@ -158,3 +165,8 @@ Kept from the first plan's section 6, plus what came after it:
   draws at pixel ratio 1, redraws a menu only when it changed, falls back to the arrival time when a clock is far off, reloads
   itself on a new build and writes its frame rate and packet rate to the server log every 10 s (in Chromium here: 41-60 fps). Why
   Firefox was slow is not proven; its next log lines will say. `tools/standin.js`: a pretend player for rehearsals.
+- **2026-10-22, first two-headset run** (Quest Pro 192.168.137.87, Quest 3 192.168.137.111), Marek: "it seems to have worked
+  well. Even the PC was now smooth", but the PC view felt about 300 ms late (Nudgy's did not): it now draws 50 ms back instead of 80
+  and logs how late each stream arrives against its stamps (unproven cause; a headset clock estimate that is off is the suspect).
+  From the log: both lined up (335 cm), the cube's token went back and forth 8 times while they played, body tracking was granted on
+  both, the `shared` space was granted on both but never got a UUID, even with two headsets in the room. Faults: items 27 and 28.

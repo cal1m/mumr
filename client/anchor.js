@@ -18,6 +18,7 @@
 (function (M) {
   const SETTLE = 2000;          // ms with no reset (and the page visible) before the anchor is looked at again
   const STABLE = 700, STABLE_M = 0.02, STABLE_RAD = 0.02, GIVE_UP = 9000;
+  const YOUNG = 10000;          // ms: an anchor made in this session less than this long ago is not looked for again after a reset
   const NO_POSE = 6000;         // ms after the last reset with no anchor pose at all: stop waiting
 
   class Keeper {
@@ -25,7 +26,7 @@
       this.io = io; this.bus = new M.util.Emitter();
       this.anchor = null; this.frame = null; this.persistent = false; this.posed = false; this.lost = false;
       this.tried = false; this.wantCreate = false; this.restoring = false; this.reanchor = null;
-      this.track = new M.align.Resets(); this.errAt = -1e9;
+      this.track = new M.align.Resets(); this.errAt = -1e9; this.madeAt = null;
       this.stats = { resets: 0, moves: 0, finds: 0 };
     }
     on(name, fn) { this.bus.on(name, fn); return this; }
@@ -63,7 +64,7 @@
       if (this.wantCreate) {
         this.wantCreate = false; this.restoring = false;
         io.create().then(async (a) => {
-          this.anchor = a;
+          this.anchor = a; this.madeAt = io.now();
           try { const uuid = await io.persist(a); if (uuid) { io.store(uuid); this.persistent = true; } } catch (e) { this.persistent = false; }
           this._life(`anchor: a new one${this.persistent ? ', kept' : ' (not kept: this browser cannot)'}`);
           this.bus.emit('new');
@@ -80,7 +81,12 @@
         const r = this.track.settle(raw), n = (v) => Math.round(v * 100);
         settled = true;
         this._life(`anchor after the resets: ${r.kind}${r.toWant ? ` (${n(r.toWant[0])} cm from where the move puts it, ${n(r.toWas[0])} cm from where it was)` : ''}`);
-        if (r.kind !== 'followed') this.findAgain();
+        if (r.kind !== 'followed') {
+          // an anchor made new in this session a moment ago has nothing saved against it, and asking for it again by its handle fails while
+          // it is that young (second headset, first two-headset run, 2026-10-22: a reset 0.1 s after the start): it is kept as the move puts it
+          if (this.madeAt !== null && now - this.madeAt < YOUNG) this._life('anchor: made a moment ago, kept as the reset moved it');
+          else this.findAgain();
+        }
       }
       const f = this.track.effective(raw), g = this.frame;
       if (!g || Math.hypot(f.x - g.x, f.y - g.y) > 0.002 || Math.abs(M.util.wrap(f.yaw - g.yaw)) > 0.003) {

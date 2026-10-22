@@ -228,6 +228,18 @@ class TokenTest(unittest.TestCase):
         h.text(0, {"t": "claim", "body": "not a name!"})
         self.assertNotIn("not a name!", h.tokens)
 
+    def test_two_pages_that_both_give_a_body_up_do_not_hand_it_back_and_forth(self):
+        h, clock, (a, b) = make(bodies=("cube",))
+        h.text(0, {"t": "release", "body": "cube"})
+        self.assertEqual(h.tokens["cube"], 1)
+        h.text(1, {"t": "release", "body": "cube"})
+        self.assertEqual(h.tokens["cube"], 1, "player 1 gave it up a moment ago: it stays")
+        h.text(1, {"t": "release", "body": "cube"})
+        self.assertEqual(len([m for m in a.of("token") if m["body"] == "cube"]), 1)
+        clock.t += hub.RELEASE_HOLD + 1
+        h.text(1, {"t": "release", "body": "cube"})
+        self.assertEqual(h.tokens["cube"], 0, "after a while it may go back")
+
     def test_when_the_holder_leaves_a_body_goes_to_the_earliest_and_a_token_to_nobody(self):
         h, _, (a, b, c) = make(3, bodies=("sim",))
         h.text(0, {"t": "claim", "body": "cube"})

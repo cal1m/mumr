@@ -11,7 +11,7 @@ class Hub {
     this.links = new Map(); this.n = 0; this.queue = [];
     this.tokens = {}; this.busy = {};
     for (const b of this.bodies) { this.tokens[b] = null; this.busy[b] = false; }
-    this.doc = new Map(); this.latest = new Map(); this.clocks = {};
+    this.doc = new Map(); this.latest = new Map(); this.clocks = {}; this.released = {};
   }
   _hello(id, role) {
     const players = [...this.links].filter(([s]) => s < 100 && s !== id);
@@ -63,7 +63,11 @@ class Hub {
     else if (m.t === 'release') {
       if (this.tokens[m.body] !== who) return;
       if (!this.bodies.includes(m.body)) this.give(m.body, null);
-      else { const heir = [...this.links.keys()].filter((s) => s < 100 && s !== who).sort((x, y) => x - y)[0]; if (heir !== undefined) this.give(m.body, heir); }
+      else {
+        const gave = (this.released[m.body] = this.released[m.body] || {}), now = Date.now(); gave[who] = now;
+        const heir = [...this.links.keys()].filter((s) => s < 100 && s !== who && !(now - (gave[s] || -1e9) <= 5000)).sort((x, y) => x - y)[0];
+        if (heir !== undefined) this.give(m.body, heir);
+      }
     }
     else if (m.t === 'clock') { this.clocks[who] = m.off; this.all({ t: 'clock', slot: who, off: m.off }, who); }
   }
