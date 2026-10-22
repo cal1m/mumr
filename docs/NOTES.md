@@ -138,6 +138,14 @@ Each item: what is there now in Nudgy, why it costs, what MUMR does instead. **D
     the things in it, and sees its owner's full-size hand; only the owner carries and turns it); where the viewer hangs is the
     document's `wallspot` (room.js SPOT_KIND), the cube goes by a `put` request to whoever holds it. Found on the way: `[...].every(
     M.util.num)` passes the index as `num`'s lower limit (the cube's put request was refused); written out instead.
+33. **First room-model run** (Marek, 2026-10-23): "works pretty good". His scan held a second room metres away; the model needed a
+    scale; a cube moved in the model did not look held (here or in the model) until it was let go. **Done:** room.js `splitRooms`
+    (every floor is a room, every other plane goes with each room whose floor it stands on or touches) and a room picker: Upload with
+    more than one room shows a map of the rooms' floors in the line-up menu (each room a button, Cancel, Import); the first upload to
+    an empty server takes the room the headset stands in. A third handle on the model, a green pill at its front left corner pointing
+    at its middle, scales it (0.3 to 4 times; the scale goes in the owner's menus info). A cube moved in a model is now held by that
+    hand like a held cube (cube.steer: the same spring; the moving page takes the token; white edges for everybody), and falls when
+    let go, also when the hand is lost.
 
 ## 3. Things that must not be lost (from the Nudgy build)
 

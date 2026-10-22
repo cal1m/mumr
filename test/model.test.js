@@ -55,6 +55,10 @@ test('its handles: the owner carries and turns it; another player\'s hands only 
   g.update([hand('l', to, true)], theirs());
   ev = g.update([hand('l', to, false)], theirs());
   assert.strictEqual(ev[0].phase, 'drop'); [0, -1, 0.3].forEach((v, i) => near(ev[0].at[i], v, 1e-9));
+  // a hand that is lost while it holds a thing lets go of it where it last was
+  g.update([hand('l', c, false)], theirs()); g.update([hand('l', c, true)], theirs()); g.update([hand('l', to, true)], theirs());
+  ev = g.update([], theirs());
+  assert.deepStrictEqual(ev.map((e) => [e.id, e.phase]), [['cube', 'drop']]); near(ev[0].at[1], -1, 1e-9);
 });
 
 test('the viewer goes only onto a wall: the nearest one to where it is let go, at that height, facing into the room', () => {
@@ -92,4 +96,76 @@ test('two headsets: where the viewer hangs is one place for both (and for a newc
   near(holder.cube.x, 0.5, 1e-9); near(holder.cube.z, 0.3, 1e-9);
   for (let i = 0; i < 60; i++) holder.cube.step(0.016, i * 0.016, []);
   near(holder.cube.z, C.HALF, 1e-9, 'it fell onto the floor');
+});
+
+// a scan with two rooms 5 m apart (Marek's had one): a wall between nothing, a table in the first, a bed in the second
+const two = () => ({ planes: [
+  { l: 'floor', v: false, p: [[-1, -1.5, 0], [3, -1.5, 0], [3, 1.6, 0], [-1, 1.6, 0]] },
+  { l: 'table', v: false, p: [[0.9, 0, 0.72], [1.7, 0, 0.72], [1.7, 0.6, 0.72], [0.9, 0.6, 0.72]] },
+  { l: 'wall', v: true, p: [[-1, 1.6, 0], [3, 1.6, 0], [3, 1.6, 2.4], [-1, 1.6, 2.4]] },
+  { l: 'floor', v: false, p: [[5, -1, 0], [8, -1, 0], [8, 2, 0], [5, 2, 0]] },
+  { l: 'wall', v: true, p: [[5, 2, 0], [8, 2, 0], [8, 2, 2.4], [5, 2, 2.4]] },
+  { l: 'bed', v: false, p: [[6, 0, 0.5], [7.5, 0, 0.5], [7.5, 1.5, 0.5], [6, 1.5, 0.5]] },
+] });
+
+test('a scan with two rooms is two rooms: each floor with what stands on it or touches it', () => {
+  const rooms = M.room.splitRooms(two(), [0, 0]);
+  assert.deepStrictEqual(rooms.map((r) => r.planes), [[0, 1, 2], [3, 4, 5]]);
+  assert.deepStrictEqual(rooms.map((r) => r.here), [true, false]);
+  near(rooms[1].w, 3, 1e-9); near(rooms[1].d, 3, 1e-9);
+  assert.strictEqual(M.room.pickRooms(two(), rooms, [1]).planes.length, 3);
+  assert.strictEqual(M.room.splitRooms(room(), null).length, 1, 'one floor: one room, all of it');
+});
+
+test('Upload with two rooms asks which: the map in the line-up menu, a press picks, Import uploads only those; the first upload takes the room you stand in', () => {
+  const hub = new Hub();
+  const said = [], S = new M.session.Session(hub.link('A'), {}), sp = new AL.Space({ x: 0, y: 0, yaw: 0, z: 0 }, 0), R = new M.room.Room(S, sp, { say: (t) => said.push(t) });
+  hub.flush(); S.setLined({ dist: 3 }); R.setScan(two());
+  R.update(0, [6, 0.5]); hub.flush();                         // (standing in the second room)
+  assert.strictEqual(S.doc.room.data.planes.length, 3); assert.ok(S.doc.room.data.planes.some((q) => q.l === 'bed'), 'the room it stands in');
+  const L = new M.lineup.LineUp(S, sp), sys = new M.sysmenu.SysMenu(S, L, { room: R });
+  sys.press('lineUp'); sys.press('supplyRoom');
+  assert.match(said.join(' '), /2 rooms/);
+  let lay = M.sysmenu.SysMenu.layout(sys.info());
+  assert.strictEqual(lay.title.text, 'Import rooms'); assert.strictEqual(lay.shapes.length, 2);
+  assert.deepStrictEqual(lay.buttons.map((b) => b.id), ['roomPick1', 'roomPick2', 'roomCancel', 'roomImport']);
+  assert.deepStrictEqual(lay.buttons.slice(0, 2).map((b) => b.active), [false, true], 'the room you stand in is picked first');
+  assert.ok(M.sysmenu.SysMenu.width(sys.info()) > M.sysmenu.OPEN_W, 'the map is wider');
+  const at = (id) => { const b = lay.buttons.find((q) => q.id === id); return [(b.x + b.w / 2) / lay.w, (b.y + b.h / 2) / lay.h]; };
+  assert.strictEqual(M.menus.hit(lay, ...at('roomPick1')), 'roomPick1', 'a room on the map is a button');
+  sys.press('roomPick1'); lay = M.sysmenu.SysMenu.layout(sys.info());
+  assert.deepStrictEqual(lay.buttons.slice(0, 2).map((b) => b.active), [true, true]);
+  sys.press('roomImport'); hub.flush();
+  assert.strictEqual(S.doc.room.data.planes.length, 6, 'both rooms');
+  assert.strictEqual(R.choice, null); assert.notStrictEqual(M.sysmenu.SysMenu.layout(sys.info()).title.text, 'Import rooms');
+  sys.press('supplyRoom'); sys.press('roomPick2'); sys.press('roomCancel'); hub.flush();
+  assert.strictEqual(S.doc.room.data.planes.length, 6, 'Cancel: nothing went up');
+});
+
+test('the scale pill: pulled out it grows the model, pushed in it shrinks it, within K_MIN..K_MAX; the room maps through the scale', () => {
+  const F = MD.frameOf(room()), pose = { x: 0, y: 0, z: 1, yaw: 0, k: 1 }, H = MD.handles(pose, F);
+  const h = new MD.Hands(), models = () => [{ key: 'own', mine: true, pose, F, things: [] }];
+  h.update([hand('r', H.scale, false)], models());
+  assert.strictEqual(h.update([hand('r', H.scale, true)], models())[0].what, 'scale');
+  let ev = h.update([hand('r', [H.scale[0] * 2, H.scale[1] * 2, H.scale[2]], true)], models());
+  near(ev[0].pose.k, 2, 1e-9, 'twice as far from the middle: twice as big');
+  ev = h.update([hand('r', [H.scale[0] * 0.01, H.scale[1] * 0.01, H.scale[2]], true)], models());
+  near(ev[0].pose.k, MD.K_MIN, 1e-9);
+  const big = Object.assign({}, pose, { k: 2 }), p = [2, 1, 0.5], q = MD.toModel(big, F, p);
+  near(q[0], 2 * F.s * (2 - F.cx), 1e-9); MD.fromModel(big, F, q).forEach((v, i) => near(v, p[i], 1e-9));
+});
+
+test('moved in a model, the cube is held by that hand: it follows (and says it is held), and falls where it is let go', () => {
+  const cube = new C.Cube();
+  cube.place(0, 0);
+  cube.steer = [0.5, 0.2, 0.4];
+  for (let i = 0; i < 60; i++) cube.step(0.016, i * 0.016, []);
+  near(cube.x, 0.5, 1e-3); near(cube.z, 0.4, 1e-3);
+  assert.strictEqual(cube.drawn().held, true); assert.strictEqual(cube.moving(), true);
+  const ad = C.adapter(cube, new AL.Space({ x: 0, y: 0, yaw: 0, z: 0 }, 0));
+  assert.ok(ad.reach([]) && ad.touching([]), 'this page takes the cube and keeps it while it moves it');
+  assert.strictEqual(ad.pack()[7], 1, 'the others see it held');
+  cube.steer = null;
+  for (let i = 0; i < 80; i++) cube.step(0.016, i * 0.016, []);
+  near(cube.z, C.HALF, 1e-6, 'fell'); assert.strictEqual(cube.drawn().held, false);
 });

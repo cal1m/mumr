@@ -6,20 +6,26 @@
 // the line-up menu's Room row ('supplyRoom', acts for the menu's owner) uploads that headset's scan, once, when pressed. Nothing else
 // changes it: not a room setup, not a headset leaving, not a line-up moving. The room goes up in the common frame, so a headset must be
 // lined up to upload. Alone, not lined up, or while the server has no room, a page uses its own scan.
+// A scan may hold more than one room (Marek's held another room metres away, 2026-10-23): each room has its own floor (splitRooms).
+// Then Upload first asks which rooms to import, on a map in the line-up menu (each room's floor; a press on a room picks it or leaves
+// it, 'roomImport' uploads the picked ones, 'roomCancel' does not); the first upload to a server that has none takes the room this
+// headset stands in (the largest when it stands in none).
 //
 //   const room = new Room(session, space, { life, say })
 //   setScan(planes)       this headset's own scan, floor plan (fromXR); call it when it may have changed (it compares)
-//   press(id)             'supplyRoom' (ACTIONS) -> true; uploads this headset's scan
-//   update(nowMs)         every frame (the one upload to a server that has no room)
+//   press(id)             ACTIONS: 'supplyRoom' uploads this headset's scan (or opens the room picker), 'roomPick1'..'roomPick8',
+//                         'roomImport', 'roomCancel' -> true when it was one of them
+//   update(nowMs, here)   every frame (the one upload to a server that has no room); here: [x, y] where this headset stands
 //   local()               the room this page uses, in its floor plan: { planes: [{ l: label, v: vertical?, p: [[x, y, h], ...] }] } or null
-//   info()                for the menus: { kept (the server has one), by (who uploaded it), at (when, ms), n (planes), own (planes here) }
+//   info()                for the menus: { kept (the server has one), by (who uploaded it), at (when, ms), n (planes), own (planes here),
+//                         choice (while picking rooms: { rooms: [{ k, w, d, n, here, picked, poly: the floor's outline }] }) }
 // Planes: l the headset's label ('floor', 'wall', 'table', 'couch', 'door frame', ... or 'other'), v true for an upright plane, p the
 // outline, x, y on the floor plan and h the height above the floor (this headset's, or in the common frame the common floor).
 // For an app's physics: kind(plane), support(room, x, y, top), ceiling(room, x, y, bottom), pushOut(room, x, y, z0, z1, r, from),
 // cast(room, from, dir, max) (what a pointing finger points at),
-// walls(room), surfaces(room), blocks(room).
+// walls(room), surfaces(room), blocks(room); splitRooms(room, here), pickRooms(room, rooms, picked).
 (function (M) {
-  const ACTIONS = ['supplyRoom'];
+  const PICKS = 8, ACTIONS = ['supplyRoom', 'roomImport', 'roomCancel'].concat(Array.from({ length: PICKS }, (_, i) => `roomPick${i + 1}`));
   const r2 = (v) => Math.round(v * 100) / 100;            // (centimetres are enough for a room)
 
   // XR planes -> the floor plan. planes: [{ matrix (16, column-major: the plane's pose in the XR reference space), polygon: [{ x, z }] (in
@@ -42,6 +48,8 @@
       this.S = session; this.space = space; this.opts = opts;
       this.own = null; this.ownSig = '';
       this.tried = false;                     // this connection has had its one look at whether the server needs a room
+      this.choice = null;                     // { rooms, picked: Set } while the player picks which rooms to import
+      this.here = null;                       // [x, y]: where this headset stands
       this._cache = { room: null, sig: null, out: null };
       session.on('join', () => { this.tried = false; });
       session.on('room', (r) => this._life(`room: the server's room is now ${r.data.planes.length} planes, uploaded by ${r.by === null ? 'a player' : `player ${r.by + 1}`}`));
@@ -56,25 +64,53 @@
       this._life(`room: this headset's scan has ${room ? room.planes.length : 0} planes`);
       return true;
     }
-    _upload(why) {
+    _upload(why, scan = this.own) {
       const S = this.S, sp = this.space;
-      S.emit({ k: 'room', data: mapRoom(this.own, (p) => sp.toCommon(p)), by: S.me, at: Date.now() });
-      this._life(`room: uploaded this headset's scan (${this.own.planes.length} planes): ${why}`);
+      S.emit({ k: 'room', data: mapRoom(scan, (p) => sp.toCommon(p)), by: S.me, at: Date.now() });
+      this._life(`room: uploaded this headset's scan (${scan.planes.length} planes): ${why}`);
     }
+    // the room this headset stands in, else the largest
+    _mine(rooms) { const h = rooms.findIndex((r) => r.here); return h >= 0 ? h : rooms.reduce((b, r, k) => (r.w * r.d > rooms[b].w * rooms[b].d ? k : b), 0); }
     press(id) {
-      if (id !== 'supplyRoom') return false;
       const S = this.S;
-      if (!S.connected) this._say('Alone: the room is this headset\'s own');
-      else if (!this.space.ok) this._say('Line up first: the room goes to the server in the common frame');
-      else if (!this.own) this._say('This headset has no room scan (Room setup makes one)');
-      else { this._upload('the Upload button'); this._say('The server has this headset\'s room now'); }
-      return true;
+      if (id === 'supplyRoom') {
+        if (!S.connected) this._say('Alone: the room is this headset\'s own');
+        else if (!this.space.ok) this._say('Line up first: the room goes to the server in the common frame');
+        else if (!this.own) this._say('This headset has no room scan (Room setup makes one)');
+        else {
+          const rooms = splitRooms(this.own, this.here);
+          if (rooms.length < 2) { this._upload('the Upload button'); this._say('The server has this headset\'s room now'); }
+          else { this.choice = { rooms: rooms.slice(0, PICKS), picked: new Set([this._mine(rooms)]) }; this._say(`The scan has ${rooms.length} rooms: pick the ones to import`); }
+        }
+        return true;
+      }
+      if (id === 'roomCancel') { this.choice = null; return true; }
+      if (id === 'roomImport') {
+        const c = this.choice;
+        if (c && c.picked.size && this.space.ok) {
+          this._upload(`the Upload button, rooms ${[...c.picked].map((k) => k + 1).join(', ')} of ${c.rooms.length}`, pickRooms(this.own, c.rooms, [...c.picked]));
+          this._say(`The server has ${c.picked.size} of the ${c.rooms.length} rooms now`);
+          this.choice = null;
+        }
+        return true;
+      }
+      const m = /^roomPick(\d+)$/.exec(id);
+      if (m) {
+        const k = +m[1] - 1, c = this.choice;
+        if (c && k < c.rooms.length) { if (c.picked.has(k)) c.picked.delete(k); else c.picked.add(k); }
+        return true;
+      }
+      return false;
     }
-    update() {
+    update(now, here) {
       const S = this.S;
+      if (here) this.here = here;
       if (this.tried || !S.connected || S.isViewer || !this.space.ok || !this.own) return;
       this.tried = true;
-      if (!S.doc.room) this._upload('the server had no room');
+      if (S.doc.room) return;
+      const rooms = splitRooms(this.own, this.here);
+      if (rooms.length < 2) this._upload('the server had no room');
+      else { const k = this._mine(rooms); this._upload(`the server had no room; room ${k + 1} of the scan's ${rooms.length}, where this headset is`, pickRooms(this.own, rooms, [k])); }
     }
     local() {
       const S = this.S, sp = this.space, d = S.doc.room;
@@ -85,7 +121,9 @@
     }
     info() {
       const S = this.S, d = S.connected ? S.doc.room : null;
-      return { kept: !!d, by: d ? d.by : null, at: d ? d.at : null, n: d ? d.data.planes.length : 0, own: this.own ? this.own.planes.length : 0 };
+      const c = this.choice;
+      return { kept: !!d, by: d ? d.by : null, at: d ? d.at : null, n: d ? d.data.planes.length : 0, own: this.own ? this.own.planes.length : 0,
+        choice: c ? { rooms: c.rooms.map((r, k) => ({ k, w: r2(r.w), d: r2(r.d), n: r.planes.length, here: r.here, picked: c.picked.has(k), poly: r.floor.map((q) => q.map(r2)) })) } : null };
     }
   }
 
@@ -251,9 +289,35 @@
     keep: () => ({ key: 'wallspot' }),
     apply(S, e) { if ([e.x, e.y, e.h, e.yaw].every(Number.isFinite)) { S.doc.wallspot = { x: e.x, y: e.y, h: e.h, yaw: e.yaw }; S.notify('wallspot', S.doc.wallspot); } },
   };
+  // The rooms of one scan: every floor is a room (a headset's room setup gives each room its own floor), and every other plane goes with
+  // each room whose floor it stands on or touches (within TOUCH: a wall between two rooms goes with both), else with the nearest.
+  // -> [{ planes: indices into room.planes, floor: its outline [[x, y]], w, d (m), here (the point `here` [x, y] is on it) }]; one room
+  // (the whole scan) when it has fewer than two floors.
+  const TOUCH = 0.3;
+  function splitRooms(room, here) {
+    const P = (room && room.planes) || [], floors = [];
+    const box = (pts) => { const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]); return { w: Math.max(...xs) - Math.min(...xs), d: Math.max(...ys) - Math.min(...ys) }; };
+    P.forEach((pl, i) => { if (!pl.v && /floor/i.test(pl.l)) floors.push(i); });
+    if (floors.length < 2) {
+      const pts = P.flatMap((pl) => pl.p.map((q) => [q[0], q[1]])), b = pts.length ? box(pts) : { w: 0, d: 0 };
+      const outline = floors.length ? P[floors[0]].p.map((q) => [q[0], q[1]]) : pts.length ? [[Math.min(...pts.map((q) => q[0])), Math.min(...pts.map((q) => q[1]))], [Math.max(...pts.map((q) => q[0])), Math.max(...pts.map((q) => q[1]))]] : [];
+      return [{ planes: P.map((_, i) => i), floor: outline, w: b.w, d: b.d, here: true }];
+    }
+    const rooms = floors.map((i) => { const poly = P[i].p.map((q) => [q[0], q[1]]), b = box(poly); return { planes: [i], floor: poly, w: b.w, d: b.d, here: !!here && inside(poly, here[0], here[1]) }; });
+    P.forEach((pl, i) => {
+      if (floors.includes(i)) return;
+      const cx = pl.p.reduce((a, q) => a + q[0], 0) / pl.p.length, cy = pl.p.reduce((a, q) => a + q[1], 0) / pl.p.length, near = [];
+      let best = 0, bd = Infinity;
+      rooms.forEach((r, k) => { const d = inside(r.floor, cx, cy) ? 0 : edge(r.floor, cx, cy)[2]; if (d <= TOUCH) near.push(k); if (d < bd) { bd = d; best = k; } });
+      for (const k of near.length ? near : [best]) rooms[k].planes.push(i);
+    });
+    return rooms;
+  }
+  // the scan with only the picked rooms (indices into splitRooms' list); a plane two of them share is there once
+  const pickRooms = (room, rooms, picked) => ({ planes: [...new Set(picked.flatMap((k) => rooms[k].planes))].sort((a, b) => a - b).map((i) => room.planes[i]) });
   const walls = (room) => (room ? prep(room).walls : []);
   const surfaces = (room) => (room ? prep(room).tops : []);
   const blocks = (room) => (room ? prep(room).blocks : []);
 
-  M.room = { Room, ACTIONS, fromXR, mapRoom, kind, support, ceiling, pushOut, cast, wallSpot, SPOT_KIND, walls, surfaces, blocks, TABLE_T, SOLID_MIN };
+  M.room = { Room, ACTIONS, fromXR, mapRoom, splitRooms, pickRooms, kind, support, ceiling, pushOut, cast, wallSpot, SPOT_KIND, walls, surfaces, blocks, TABLE_T, SOLID_MIN };
 })(typeof module !== 'undefined' ? (module.exports = require('./ns.js')) : (globalThis.MUMR = globalThis.MUMR || {}));

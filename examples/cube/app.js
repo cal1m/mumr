@@ -13,7 +13,7 @@ import { makeCube, setCube, ownerOf } from './draw.js';
 
 const M = window.MUMR, C = window.CUBE, cube = new C.Cube(), cubeMesh = makeCube(THREE, C.SIZE);
 const owner = (S) => (S.connected ? ownerOf(S.holder('cube'), S.me, PLAYER_COLOURS) : null);
-let pointers = null, pointing = [], cubeTarget = null;
+let pointers = null, pointing = [];
 
 // The pointing demo: every pointing hand in the world (this player's and the others', from their joints: nothing is sent for it) gets a
 // ray to what it points at, the cube or a part of the room, with a sign saying what that is; the cube's edges turn yellow while
@@ -38,13 +38,10 @@ const app = await createApp({
     open: (st) => !!st.model, handIrl: (st) => !!st.handIrl,
     things: () => {
       const d = cube.drawn();
-      return [{ id: 'cube', label: 'cube', kind: 'box', at: [d.x, d.y, d.z], yaw: d.yaw, size: [C.SIZE], colour: C.COLOURS[(app.S.game('colour') || 0) % C.COLOURS.length], preview: cubeTarget,
-        drag: (phase, at) => {
-          cubeTarget = phase === 'drop' ? null : at;
-          if (phase !== 'drop') return;
-          const { space } = app, c = space.ok ? space.toCommon(at) : at;
-          app.bodies[0].ask('put', { x: c[0], y: c[1], z: Math.max(C.HALF, c[2]) });
-        } }];
+      // moved in the model, the cube is held by the hand there: this page takes it and it follows (here and in every model), and
+      // falls where it is let go
+      return [{ id: 'cube', label: 'cube', kind: 'box', at: [d.x, d.y, d.z], yaw: d.yaw, size: [C.SIZE], colour: C.COLOURS[(app.S.game('colour') || 0) % C.COLOURS.length],
+        drag: (phase, at) => { cube.steer = phase === 'drop' ? null : at; } }];
     },
   },
   bodies: ({ space }) => [{ token: 'cube', type: 'cube', adapter: C.adapter(cube, space) }],
@@ -64,7 +61,7 @@ const app = await createApp({
     pointers.update(pointing.map((p) => ({ from: p.from, at: p.at, label: p.what, colour: p.colour })));
     setCube(cubeMesh, Object.assign(cube.drawn(), { pointed: pointing.some((p) => p.cube) }), C.COLOURS[(S.game('colour') || 0) % C.COLOURS.length], owner(S));
   },
-  status: () => `cube: ${app.bodies[0].mine ? 'simulated here' : (owner(app.S) || { text: 'nobody' }).text}${cube.held ? `, held (${cube.held.kind})` : ''}${cube.onHand ? ', on a hand' : ''}`
+  status: () => `cube: ${app.bodies[0].mine ? 'simulated here' : (owner(app.S) || { text: 'nobody' }).text}${cube.held ? `, held (${cube.held.kind})` : cube.steer ? ', held in the room model' : ''}${cube.onHand ? ', on a hand' : ''}`
     + `${pointing.length ? `   pointing at: ${pointing.map((p) => p.what || 'nothing').join(', ')}` : ''}`,
 });
 window.__cube = Object.assign(app, { cube, body: app.bodies[0], pointing: () => pointing });

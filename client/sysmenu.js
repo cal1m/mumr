@@ -15,8 +15,8 @@
 //   SysMenu.layout(info)     the layout (menus.grid) for anybody's wrist menu; SysMenu.width(info): its width in metres
 //   place(head, jp, floorY)  where it floats this frame (a panel pose), or null while the wrist does not look at you
 (function (M) {
-  const OWN = ['sysOpen', 'sysClose', 'exit', 'roomSetup', 'supplyRoom'];
-  const OPEN_W = 0.22, FOLDED_W = 0.06;
+  const OWN = ['sysOpen', 'sysClose', 'exit', 'roomSetup'];
+  const OPEN_W = 0.22, FOLDED_W = 0.06, MAP_W = 0.32;
   const HIDDEN = 5000;          // ms hidden in a row before the open home menu folds (Marek: 10 s, then 5)
   const WRIST_SIDE = 'left';
 
@@ -28,15 +28,36 @@
     return [{ label: 'Room', value: what, span: 4, active: !!r.kept }, { id: 'supplyRoom', label: 'Upload', value: r.own ? `my ${r.own} planes` : 'no scan here', off: !r.own }];
   }
 
+  // The room picker (room.js: a scan with more than one room): a map of the rooms' floors, seen from above with the front of the headset
+  // up when the scan was made; each room is a button (pick it or leave it), and Cancel / Import under the map
+  function roomMap(ch) {
+    const W = 768, MAP = { x: 14, y: 74, w: 740, h: 440 }, pts = ch.rooms.flatMap((r) => r.poly);
+    const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const sc = 0.92 * Math.min(MAP.w / Math.max(0.5, x1 - x0), MAP.h / Math.max(0.5, y1 - y0)), mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+    const X = (x) => MAP.x + MAP.w / 2 + (x - mx) * sc, Y = (y) => MAP.y + MAP.h / 2 - (y - my) * sc;
+    const shapes = ch.rooms.map((r) => ({ pts: r.poly.map((q) => [X(q[0]), Y(q[1])]), colour: r.picked ? '#4ea1ff' : '#6b7280', fill: r.picked ? 'rgba(78,161,255,0.22)' : 'rgba(255,255,255,0.04)' }));
+    const buttons = ch.rooms.map((r) => {
+      const px = r.poly.map((q) => X(q[0])), py = r.poly.map((q) => Y(q[1]));
+      let bx = Math.min(...px), by = Math.min(...py), bw = Math.max(...px) - bx, bh = Math.max(...py) - by;
+      if (bw < 130) { bx -= (130 - bw) / 2; bw = 130; }
+      if (bh < 70) { by -= (70 - bh) / 2; bh = 70; }
+      return { id: `roomPick${r.k + 1}`, label: `Room ${r.k + 1}${r.here ? ' (you)' : ''}`, value: `${r.w} x ${r.d} m`, x: bx, y: by, w: bw, h: bh, active: r.picked, off: false, ghost: true };
+    });
+    const n = ch.rooms.filter((r) => r.picked).length, by = MAP.y + MAP.h + 14, bh = 84;
+    buttons.push({ id: 'roomCancel', label: 'Cancel', value: '', x: 14, y: by, w: 240, h: bh, active: false, off: false },
+      { id: 'roomImport', label: 'Import', value: `${n} of ${ch.rooms.length} rooms`, x: 268, y: by, w: 486, h: bh, active: n > 0, off: n === 0 });
+    return { w: W, h: by + bh + 14, title: { text: 'Import rooms', note: 'press a room to pick it', h: 60 }, buttons, shapes };
+  }
+
   class SysMenu {
     constructor(session, lineup, opts = {}) {
       this.session = session; this.lineup = lineup; this.opts = opts;
       this.open = false; this.shown = false; this.pose = null;
       this.now = opts.now || M.util.nowMs; this.hiddenAt = null;
     }
-    static get ACTIONS() { return OWN.concat(M.lineup.ACTIONS); }
+    static get ACTIONS() { return OWN.concat(M.lineup.ACTIONS, M.room.ACTIONS); }
     // the open menu is the home menu (nothing else, such as lining up, is open in it): only that one folds by itself
-    get home() { return this.open && !(this.lineup && this.lineup.active); }
+    get home() { return this.open && !(this.lineup && this.lineup.active) && !(this.opts.room && this.opts.room.choice); }
     _fold(why) { this.open = false; this.hiddenAt = null; if (this.opts.life) this.opts.life(`wrist menu folded: ${why}`); }
     // hidden this frame: the open home menu folds once it has been hidden for HIDDEN ms in a row
     _hidden(why) {
@@ -51,7 +72,7 @@
       if (id === 'sysClose') { this.open = false; return true; }
       if (id === 'exit') { if (this.opts.exit) this.opts.exit(); return true; }
       if (id === 'roomSetup') { if (this.opts.roomSetup) this.opts.roomSetup(); return true; }
-      if (id === 'supplyRoom') { if (this.opts.room) this.opts.room.press(id); return true; }
+      if (this.opts.room && this.opts.room.press(id)) { if (this.opts.room.choice) this.open = true; return true; }     // (the room picker must be seen)
       if (this.lineup && this.lineup.press(id)) { if (id === 'lineUp' && this.lineup.active) this.open = true; return true; }      // (lining up: the fields must be seen)
       return false;
     }
@@ -61,9 +82,10 @@
         dist: f && f.how !== 'given' ? +(f.dist || 0).toFixed(2) : null, note: L ? L.note() : '', roomUsed: !!this.opts.roomUsed && this.opts.roomUsed(),
         room: this.opts.room ? this.opts.room.info() : null };
     }
-    static width(info) { return info && info.open ? OPEN_W : FOLDED_W; }
+    static width(info) { return info && info.open ? (info.room && info.room.choice ? MAP_W : OPEN_W) : FOLDED_W; }
     static layout(info) {
       info = info || {};
+      if (info.open && info.room && info.room.choice) return roomMap(info.room.choice);
       if (!info.open) return M.menus.grid({ w: 256, titleH: 0, rowH: 200, rows: [[{ id: 'sysOpen', label: 'MUMR', value: info.lining ? 'lining up' : '', active: !!info.lining }]] });
       if (info.lining) {
         return M.menus.grid({ w: 768, title: 'Line up', note: info.note || '', top: [{ id: 'sysClose', label: '-', w: 80 }, { id: 'lineUp', label: 'Done', active: true, w: 150 }],

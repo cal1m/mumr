@@ -135,6 +135,15 @@ export async function createApp(o) {
     life(`pretend line-up ${QS.get('frame')}`);
   }
   // a pretend room scan for the desktop rehearsal: a floor, a table, a bed and two walls in this tab's floor plan
+  // (?room=two: the same and a second room 5 m away, as Marek's scan had: the room picker)
+  if (QS.get('room') === 'two') room.setScan({ planes: [
+    { l: 'floor', v: false, p: [[-1, -1.5, 0], [3, -1.5, 0], [3, 1.6, 0], [-1, 1.6, 0]] },
+    { l: 'table', v: false, p: [[0.9, 0.0, 0.72], [1.7, 0.0, 0.72], [1.7, 0.6, 0.72], [0.9, 0.6, 0.72]] },
+    { l: 'wall', v: true, p: [[-1, 1.6, 0], [3, 1.6, 0], [3, 1.6, 2.4], [-1, 1.6, 2.4]] },
+    { l: 'floor', v: false, p: [[5, -1, 0], [8, -1, 0], [8, 2, 0], [5, 2, 0]] },
+    { l: 'wall', v: true, p: [[5, 2, 0], [8, 2, 0], [8, 2, 2.4], [5, 2, 2.4]] },
+    { l: 'bed', v: false, p: [[6, 0, 0.5], [7.5, 0, 0.5], [7.5, 1.5, 0.5], [6, 1.5, 0.5]] },
+  ] });
   if (QS.get('room') === 'demo') room.setScan({ planes: [
     { l: 'floor', v: false, p: [[-1, -1.5, 0], [3, -1.5, 0], [3, 1.6, 0], [-1, 1.6, 0]] },
     { l: 'table', v: false, p: [[0.9, 0.0, 0.72], [1.7, 0.0, 0.72], [1.7, 0.6, 0.72], [0.9, 0.6, 0.72]] },
@@ -239,7 +248,7 @@ export async function createApp(o) {
     // lining up, then everything that is shared
     lineup.update(now, dt, M.hands.tips(own, Object.fromEntries(own.map((s) => [s.id, !!s.pinch]))));
     S.tick(now);
-    room.update(now);
+    room.update(now, [head[0], head[1]]);
     presence.send(now, head, own.concat(feet));
     const all = presence.hands(lineup.active ? [] : own.concat(FEET === 'kick' ? feet : []), now);         // (a hand that lines up does not touch anything)
     if (!lineup.active) for (const b of bodies) b.frame(now, own);
@@ -272,6 +281,7 @@ export async function createApp(o) {
   // "hand IRL" on is also drawn full size in the room, where it would be.
   const RM = o.roomModel || null, modelHands = new M.model.Hands(), model3d = new Map(), bigHands = [];
   let modelPose = null, modelHot = null;
+  app.modelPose = () => modelPose;
   function viewerThing() {
     const r = room.local(), sp = viewerPreview || viewerSpot() || (r ? wallSpot(r) : null);
     if (!handWall || !sp) return null;
@@ -291,19 +301,19 @@ export async function createApp(o) {
     if (F && RM.open(S.stateOf(null))) {
       if (!modelPose) {
         const h = head;
-        modelPose = xr ? { x: h[0] + Math.cos(h[2]) * 0.5, y: h[1] + Math.sin(h[2]) * 0.5, z: Math.max(0.6, h[3] - 0.5), yaw: h[2] - Math.PI / 2 } : { x: 0.35, y: 0.1, z: 0.04, yaw: 0 };
+        modelPose = xr ? { x: h[0] + Math.cos(h[2]) * 0.5, y: h[1] + Math.sin(h[2]) * 0.5, z: Math.max(0.6, h[3] - 0.5), yaw: h[2] - Math.PI / 2, k: 1 } : { x: 0.35, y: 0.1, z: 0.04, yaw: 0, k: 1 };
       }
       models.push({ key: 'own', slot: S.me, mine: true, pose: modelPose });
     } else modelPose = null;
     if (F) for (const q of menus.others(now)) {
       const p = q.panels.find((x) => x.id === 'model');
-      if (p) models.push({ key: `p${q.slot}`, slot: q.slot, mine: false, pose: { x: p.pose.x, y: p.pose.y, z: p.pose.h - space.floorY, yaw: p.pose.yaw } });
+      if (p) models.push({ key: `p${q.slot}`, slot: q.slot, mine: false, pose: { x: p.pose.x, y: p.pose.y, z: p.pose.h - space.floorY, yaw: p.pose.yaw, k: q.info && q.info.model ? +q.info.model.k || 1 : 1 } });
     }
     const things = F ? (RM.things ? RM.things(app) : []).concat([viewerThing()].filter(Boolean)) : [];
     for (const m of models) { m.F = F; m.things = things; }
     // the hands: this page's own reach into any model
     for (const ev of modelHands.update(lineup.active ? [] : own, models)) {
-      if (ev.what === 'move' || ev.what === 'turn') { modelPose = ev.pose; modelHot = ev.what; continue; }
+      if (ev.what === 'move' || ev.what === 'turn' || ev.what === 'scale') { modelPose = ev.pose; modelHot = ev.what; continue; }
       const th = things.find((t) => t.id === ev.id);
       if (th && th.drag) th.drag(ev.phase, ev.at);
       if (ev.phase === 'start') life(`room model: took the ${ev.id}`);
@@ -330,7 +340,7 @@ export async function createApp(o) {
         const tip = s.joints[9], palm = s.joints[10];
         if (!M.model.inside(m.pose, F, tip, 0.03) && !M.model.inside(m.pose, F, palm, 0.03)) continue;
         if (!bigHands[n]) { bigHands[n] = new GhostHand(0.35); scene.add(bigHands[n].mesh); }
-        const jp = new Float32Array(75), jr = new Float32Array(25).fill(Math.min(0.12, 0.009 / F.s));
+        const jp = new Float32Array(75), jr = new Float32Array(25).fill(Math.min(0.12, 0.009 / M.model.scaleOf(m.pose, F)));
         s.joints.forEach((q, i) => { const p = M.model.fromModel(m.pose, F, q); jp[i * 3] = p[0]; jp[i * 3 + 1] = p[2] + space.floorY; jp[i * 3 + 2] = -p[1]; });
         bigHands[n].update(jp, jr, m.mine ? 0xf2c14e : PLAYER_COLOURS[m.slot % PLAYER_COLOURS.length]);
         n++;
@@ -344,7 +354,7 @@ export async function createApp(o) {
   function menusFrame(now, dt, hd, handsXR, tips) {
     const at = { x: hd[0], y: hd[1], th: hd[2], py: hd[3] + space.floorY };
     if (!follower.pose) { if (xr) follower.snap(at); else follower.set({ x: 0.9, y: 0.55, h: 0.95, yaw: -2.4, pitch: 0.15 }); }
-    const sysInfo = sys.info(), ownInfo = { players: S.others + 1, sys: sysInfo };
+    const sysInfo = sys.info(), ownInfo = { players: S.others + 1, sys: sysInfo, model: modelPose ? { k: +(modelPose.k || 1).toFixed(3) } : undefined };
     const want = new Set(['own:main']), busyKeys = new Set();
     const list = [{ key: 'own:main', owner: null, id: 'main', pose: follower.pose, w: MENU_W, lay: o.menu(S.stateOf(null), ownInfo) }];
     const leftHand = handsXR.find((h) => h.id === M.sysmenu.WRIST_SIDE && h.jp);

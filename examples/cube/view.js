@@ -108,7 +108,8 @@ function frame() {
     const things = [];
     if (c) things.push({ id: 'cube', kind: 'box', at: [c.data[0], c.data[1], c.data[2]], yaw: c.data[3], size: [C.SIZE], colour: C.COLOURS[(S.doc.game.colour || 0) % C.COLOURS.length] });
     if (spot) things.push({ id: 'viewer', kind: 'panel', at: [spot.x, spot.y, spot.h], yaw: spot.yaw, size: [WALL_SIZE.w, WALL_SIZE.h], colour: 0x4ea1ff });
-    models.get(p.slot).update({ x: row[1], y: row[2], z: row[3], yaw: row[4] }, F, roomNow, things, { edge: PLAYER_COLOURS[p.slot % PLAYER_COLOURS.length] });
+    const k = m.data.info && m.data.info.model ? +m.data.info.model.k || 1 : 1;
+    models.get(p.slot).update({ x: row[1], y: row[2], z: row[3], yaw: row[4], k }, F, roomNow, things, { edge: PLAYER_COLOURS[p.slot % PLAYER_COLOURS.length] });
   }
   for (const [slot, d] of [...models]) if (!seenModels.has(slot)) { d.dispose(); models.delete(slot); }
   handWall.update(roomNow, gestures.map((g) => { const s = everyone.find((q) => q.id === g.id); return { name: `player ${s.slot + 1}, ${/left/.test(g.id) ? 'left' : 'right'}`, colour: hex(PLAYER_COLOURS[s.slot % PLAYER_COLOURS.length]), source: s, g }; }), performance.now(), S.doc.wallspot || null);

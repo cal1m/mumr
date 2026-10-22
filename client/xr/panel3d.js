@@ -20,10 +20,20 @@ export function drawGrid(ctx, lay, look = {}) {
     const x = 22 + g.measureText(lay.title.text || '').width + 24, top = lay.buttons.filter((b) => b.top).reduce((a, b) => Math.min(a, b.x), W);
     g.fillStyle = COL.dim; g.font = '22px system-ui, sans-serif'; g.fillText(fit(g, note, top - x - 16), x, lay.title.h / 2);
   }
+  // shapes under the buttons (the room picker's map): { pts: [[x, y]] (px), colour, fill }
+  for (const s of lay.shapes || []) {
+    g.beginPath(); s.pts.forEach((p, i) => (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]))); g.closePath();
+    if (s.fill) { g.fillStyle = s.fill; g.fill(); }
+    g.lineWidth = 4; g.strokeStyle = s.colour || COL.dim; g.stroke();
+  }
   for (const b of lay.buttons) {
     const text = !b.id, hov = look.hover === b.id && !b.off && !text, prs = look.pressed === b.id;
-    g.fillStyle = text ? COL.cell : b.off ? COL.off : b.active ? COL.btnOn : COL.btn;
-    round(g, b.x, b.y, b.w, b.h, r); g.fill();
+    if (b.ghost) {                                       // (a button drawn as a frame only: what is under it shows)
+      g.lineWidth = b.active ? 6 : 3; g.strokeStyle = b.active ? COL.hover : COL.dim; round(g, b.x, b.y, b.w, b.h, r); g.stroke();
+    } else {
+      g.fillStyle = text ? COL.cell : b.off ? COL.off : b.active ? COL.btnOn : COL.btn;
+      round(g, b.x, b.y, b.w, b.h, r); g.fill();
+    }
     if (hov || prs) { g.lineWidth = prs ? 8 : 5; g.strokeStyle = COL.hover; round(g, b.x + 2, b.y + 2, b.w - 4, b.h - 4, r); g.stroke(); }
     g.fillStyle = b.off ? COL.dim : COL.text; g.textAlign = 'center';
     const cx = b.x + b.w / 2;

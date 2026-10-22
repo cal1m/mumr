@@ -48,6 +48,7 @@
       this.room = null;                     // the room (room.js local()), or null: the floor only
       this.ground = HALF;                   // the height of its middle when it rests where it is
       this.onHand = null;                   // { id, q (its platform) } while it rests on a flat hand
+      this.steer = null;                    // [x, y, z]: where a hand in the room model wants it (it follows like a held cube)
     }
     // a point in the cube's own frame (its middle, turned with it)
     local(x, y, z) { const c = Math.cos(this.yaw), s = Math.sin(this.yaw), dx = x - this.x, dy = y - this.y; return [c * dx + s * dy, -s * dx + c * dy, z - this.z]; }
@@ -131,6 +132,14 @@
       }
       if (this.held && !grips.some((g) => g.id === this.held.by)) this.held = null;            // the hand was lost: it falls
       if (this.held) this.onHand = null;
+      // held from the room model (Marek, 2026-10-23: it has to show that it is held, here and in the model): the same spring as a hand's
+      if (!this.held && this.steer) {
+        const ex = this.steer[0] - this.x, ey = this.steer[1] - this.y, ez = this.steer[2] - this.z, e = Math.hypot(ex, ey, ez);
+        const k = Math.min(C.spring, e > 0 ? C.holdSpeed / e : C.spring), x0 = this.x, y0 = this.y, z0 = this.z;
+        this._move(ex * k * dt, ey * k * dt, ez * k * dt);
+        if (dt > 0) { this.vx = (this.x - x0) / dt; this.vy = (this.y - y0) / dt; this.vz = (this.z - z0) / dt; }
+        this.wz = 0; this.touched = true; this.onHand = null;
+      }
       if (this.held) {
         // the hold is a spring: the cube goes towards where the hand wants it, at most holdSpeed, and stops at whatever is in the way
         const g = grips.find((q) => q.id === this.held.by), o = this.held.off;
@@ -143,7 +152,7 @@
           this.wz = 0; this.touched = true;
         }
       }
-      if (!this.held) {
+      if (!this.held && !this.steer) {
         // pushing: every point and joint of every hand that is in the cube moves it out, with the hand's speed; not a hand that is
         // closing on it (about to grip) or that touches it from two sides at once (it is holding it, not pushing it)
         for (const s of sources || []) {
@@ -211,19 +220,19 @@
       const w = M.room.pushOut(this.room, this.x, this.y, this.z - HALF + 0.005, this.z + HALF - 0.005, R);
       if (w) { this.x = w.x; this.y = w.y; }
     }
-    moving() { return !!this.held || !!this.onHand || Math.hypot(this.vx, this.vy, this.vz) > 0.002 || Math.abs(this.wz) > 0.01 || this.z > this.ground + 1e-3; }
-    drawn() { return { x: this.x + this.off.x, y: this.y + this.off.y, z: this.z + this.off.z, yaw: this.yaw + this.off.yaw, held: !!this.held }; }
+    moving() { return !!this.held || !!this.steer || !!this.onHand || Math.hypot(this.vx, this.vy, this.vz) > 0.002 || Math.abs(this.wz) > 0.01 || this.z > this.ground + 1e-3; }
+    drawn() { return { x: this.x + this.off.x, y: this.y + this.off.y, z: this.z + this.off.z, yaw: this.yaw + this.off.yaw, held: !!this.held || !!this.steer || !!this.heldByOther }; }
   }
 
   // The Body adapter: this page's hands (`own`, floor plan) decide whether it reaches; the state goes out in the common frame.
   function adapter(cube, space) {
     const C = cube.cfg, rot = (yaw, x, y) => M.align.toCommon({ x: 0, y: 0, yaw }, x, y);
     return {
-      reach: (own) => cube.nearest(own) <= C.reach,
-      touching: (own) => cube.nearest(own) <= C.busy || (!!cube.held && (own || []).some((s) => s.id === cube.held.by)),
+      reach: (own) => !!cube.steer || cube.nearest(own) <= C.reach,             // (moved in the room model from here: this page takes it)
+      touching: (own) => !!cube.steer || cube.nearest(own) <= C.busy || (!!cube.held && (own || []).some((s) => s.id === cube.held.by)),
       pack: () => {
         const p = space.toCommon([cube.x, cube.y, cube.z]), v = rot(space.frame.yaw, cube.vx, cube.vy);
-        return [p[0], p[1], p[2], space.yawToCommon(cube.yaw), v[0], v[1], cube.vz, cube.held ? 1 : 0];
+        return [p[0], p[1], p[2], space.yawToCommon(cube.yaw), v[0], v[1], cube.vz, cube.held || cube.steer ? 1 : 0];
       },
       apply: (s, info) => {
         if (!space.ok) return false;
@@ -234,7 +243,7 @@
         cube.heldByOther = s[7] > 0.5;
         return true;
       },
-      settle: () => {},
+      settle: (mine) => { if (mine) cube.heldByOther = false; },
       do: (what, args) => {
         if (what === 'place' && M.util.num(args.x) && M.util.num(args.y)) { const p = space.ok ? space.fromCommon([args.x, args.y]) : [args.x, args.y]; cube.place(p[0], p[1]); return true; }
         if (what === 'put' && [args.x, args.y, args.z].every((v) => M.util.num(v))) { const p = space.ok ? space.fromCommon([args.x, args.y, args.z]) : [args.x, args.y, args.z]; cube.put(p[0], p[1], p[2]); return true; }
