@@ -69,7 +69,7 @@ link.onBin = (b) => {
 };
 S.on('action', (id, from) => action(id, from));
 S.on('press', (id, from) => { if (from !== S.me) say(`Player ${from + 1} pressed ${id} on your menu`); });
-S.on('peer', (slot, on) => { say(on ? `Player ${slot + 1} is here` : `Player ${slot + 1} left`); life(`peer ${slot + 1} ${on ? 'joined' : 'left'}`); });
+S.on('peer', (slot, on) => { const p = S.peers.get(slot); if (slot === 15 || (p && p.host)) { life(`host ${on ? 'here' : 'gone'}`); return; } say(on ? `Player ${slot + 1} is here` : `Player ${slot + 1} left`); life(`peer ${slot + 1} ${on ? 'joined' : 'left'}`); });
 S.on('token', (t, mine) => { if (t === 'cube') life(`cube: ${mine ? 'simulated here' : `simulated by ${(ownerOf(S.holder('cube'), S.me, PLAYER_COLOURS) || { text: 'nobody' }).text}`}`); if (mine && document.hidden && !xr) away(); });
 // a page nobody looks at (a hidden tab, a headset taken off) draws no frames: it must not hold the cube, or nobody sees it move
 // (also when the frame loop has stopped without the page saying it is hidden: a paused tab, a frozen page)

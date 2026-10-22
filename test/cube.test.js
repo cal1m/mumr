@@ -110,18 +110,18 @@ test('the wrist menu: its buttons act at its owner, Line up opens it, and it sho
   pose = pose || sys.place(head, jp, 0) || sys.place(head, flipped, 0);
   assert.ok(pose && Number.isFinite(pose.yaw) && pose.h > 1, JSON.stringify(pose));
   assert.strictEqual(sys.place(head, null, 0), null, 'no hand: no menu');
-  // the open home menu folds once it has been hidden (the hand turned away) for 10 s in a row; lining up, it never folds by itself
+  // the open home menu folds once it has been hidden (the hand turned away) for 5 s in a row; lining up, it never folds by itself
   let t = 0;
   const S2 = new M.session.Session(null, {}), L2 = new M.lineup.LineUp(S2, new M.align.Space(null, 0)), folds = [];
   const s2 = new M.sysmenu.SysMenu(S2, L2, { now: () => t, life: (x) => folds.push(x) });
   const showing = s2.place(head, jp, 0) ? jp : flipped, turned = showing === jp ? flipped : jp;
   s2.press('sysOpen');
-  t = 0; s2.place(head, turned, 0); t = 9000; s2.place(head, turned, 0);
-  assert.strictEqual(s2.open, true, 'hidden 9 s: still open');
-  t = 9500; s2.place(head, showing, 0); t = 15000; s2.place(head, turned, 0); t = 24000; s2.place(head, turned, 0);
+  t = 0; s2.place(head, turned, 0); t = 4000; s2.place(head, turned, 0);
+  assert.strictEqual(s2.open, true, 'hidden 4 s: still open');
+  t = 4500; s2.place(head, showing, 0); t = 6000; s2.place(head, turned, 0); t = 10000; s2.place(head, turned, 0);
   assert.strictEqual(s2.open, true, 'shown in between: the count starts again');
-  t = 25100; s2.place(head, turned, 0);
-  assert.strictEqual(s2.open, false, 'hidden 10 s in a row: folded');
+  t = 11100; s2.place(head, turned, 0);
+  assert.strictEqual(s2.open, false, 'hidden 5 s in a row: folded');
   s2.press('lineUp'); t = 30000; s2.place(head, turned, 0); t = 90000; s2.place(head, turned, 0); s2.place(head, null, 0);
   assert.strictEqual(s2.open, true, 'lining up: it never folds by itself');
   assert.strictEqual(folds.length, 1, folds.join(' | '));

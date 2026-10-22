@@ -16,7 +16,7 @@
 (function (M) {
   const OWN = ['sysOpen', 'sysClose', 'exit', 'roomSetup'];
   const OPEN_W = 0.22, FOLDED_W = 0.06;
-  const HIDDEN = 10000;         // ms hidden in a row before the open home menu folds
+  const HIDDEN = 5000;          // ms hidden in a row before the open home menu folds (Marek: 10 s, then 5)
   const WRIST_SIDE = 'left';
 
   class SysMenu {
