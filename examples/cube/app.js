@@ -10,7 +10,7 @@ import { readInput, readLegs } from '/mumr/xr/input.js';
 import { makeGhost, GHOST_COLOURS } from '/mumr/xr/ghost.js';
 import { createPlayers, PLAYER_COLOURS } from '/mumr/xr/players3d.js';
 import { makePanels } from '/mumr/xr/panel3d.js';
-import { makeCube, setCube } from './draw.js';
+import { makeCube, setCube, ownerOf } from './draw.js';
 
 const M = window.MUMR, C = window.CUBE, QS = new URLSearchParams(location.search), $ = (id) => document.getElementById(id);
 const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent);
@@ -31,7 +31,7 @@ scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.6));
 const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(1, 3, 2); scene.add(sun);
 const world = new THREE.Group(); scene.add(world);
 const grid = new THREE.GridHelper(6, 30, 0x55607a, 0x353b4a); world.add(grid);
-const cubeMesh = makeCube(THREE, C.SIZE); world.add(cubeMesh);
+const cubeMesh = makeCube(THREE, C.SIZE); world.add(cubeMesh, cubeMesh.userData.holder);
 const GhostHand = makeGhost(THREE), ghosts = { left: new GhostHand(), right: new GhostHand() };
 for (const g of Object.values(ghosts)) scene.add(g.mesh);
 const players = createPlayers({ THREE, world, scene, GhostHand });
@@ -62,7 +62,7 @@ link.onBin = (b) => {
 S.on('action', (id, from) => action(id, from));
 S.on('press', (id, from) => { if (from !== S.me) say(`Player ${from + 1} pressed ${id} on your menu`); });
 S.on('peer', (slot, on) => { say(on ? `Player ${slot + 1} is here` : `Player ${slot + 1} left`); life(`peer ${slot + 1} ${on ? 'joined' : 'left'}`); });
-S.on('token', (t, mine) => { if (t === 'cube') life(`cube: ${mine ? 'simulated here' : `simulated by player ${(S.holder('cube') ?? -1) + 1}`}`); if (mine && document.hidden && !xr) away(); });
+S.on('token', (t, mine) => { if (t === 'cube') life(`cube: ${mine ? 'simulated here' : `simulated by ${(ownerOf(S.holder('cube'), S.me, PLAYER_COLOURS) || { text: 'nobody' }).text}`}`); if (mine && document.hidden && !xr) away(); });
 // a page nobody looks at (a hidden tab, a headset taken off) draws no frames: it must not hold the cube, or nobody sees it move
 // (also when the frame loop has stopped without the page saying it is hidden: a paused tab, a frozen page)
 setInterval(() => { if (performance.now() - last > 1000) away(); }, 500);
@@ -232,7 +232,7 @@ function onFrame(time, frame) {
   players.update(presence.others(now).map((o) => ({ slot: o.slot, head: o.head, sources: o.sources })), dt);
   players.marks(lineup.marks());
   world.position.y = space.floorY;
-  setCube(cubeMesh, cube.drawn(), C.COLOURS[(S.game('colour') || 0) % C.COLOURS.length]);
+  setCube(cubeMesh, cube.drawn(), C.COLOURS[(S.game('colour') || 0) % C.COLOURS.length], S.connected ? ownerOf(S.holder('cube'), S.me, PLAYER_COLOURS) : null);
   if (!xr) controls.update();
   renderer.render(scene, camera);
   if (now - statusAt > 300) status(now);
@@ -242,7 +242,7 @@ function status(now) {
   statusAt = now;
   const holder = S.holder('cube');
   $('status').textContent = [
-    `${S.connected ? `player ${S.me + 1} of ${S.others + 1}` : 'alone'}${S.viewers ? `, ${S.viewers} watching` : ''}   ${lineup.note()}   cube: ${body.mine ? 'simulated here' : holder === null ? 'nobody' : `player ${holder + 1}`}${cube.held ? ', held' : ''}   round trip ${link.rtt ?? '-'} ms`,
+    `${S.connected ? `player ${S.me + 1} of ${S.others + 1}` : 'alone'}${S.viewers ? `, ${S.viewers} watching` : ''}   ${lineup.note()}   cube: ${body.mine ? 'simulated here' : (ownerOf(holder, S.me, PLAYER_COLOURS) || { text: 'nobody' }).text}${cube.held ? ', held' : ''}   round trip ${link.rtt ?? '-'} ms`,
     xr ? `xr: ${xr.features.join(', ')}; shared space: ${xr.shared.state}${xr.shared.uuid ? ` (${xr.shared.uuid})` : ''}; anchor: ${keeper && keeper.anchor ? (keeper.lost ? 'lost' : 'tracked') : 'none'}` : 'desktop: left button = a fingertip on the floor (with Shift: a pinch, it picks the cube up), right button turns the view, click a menu to press it',
     ...life.lines().slice(-3),
   ].join('\n');

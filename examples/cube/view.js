@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { PLAYER_COLOURS } from '/mumr/xr/players3d.js';
 import { makePanels } from '/mumr/xr/panel3d.js';
 import { makeLegs } from '/mumr/xr/legs3d.js';
-import { makeCube, setCube } from './draw.js';
+import { makeCube, setCube, ownerOf } from './draw.js';
 
 // DELAY: how far in the past the world is drawn, so that it can be blended between packets (they come every 22 ms); ?delay=ms changes it
 const M = window.MUMR, C = window.CUBE, DELAY = Math.max(0, Math.min(1000, Number(new URLSearchParams(location.search).get('delay') ?? 50)));
@@ -19,7 +19,7 @@ scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.6));
 const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(1, 3, 2); scene.add(sun);
 const world = new THREE.Group(); scene.add(world);
 world.add(new THREE.GridHelper(8, 40, 0x55607a, 0x353b4a));
-const cubeMesh = makeCube(THREE, C.SIZE); world.add(cubeMesh);
+const cubeMesh = makeCube(THREE, C.SIZE); world.add(cubeMesh, cubeMesh.userData.holder);
 const { Panel } = makePanels(THREE, renderer);
 const toV = (x, y, z) => new THREE.Vector3(x, z, -y);
 
@@ -50,7 +50,7 @@ const mtx = new THREE.Matrix4();
 function frame() {
   const t = feed.serverNow(), at = t === null ? undefined : t - DELAY, S = feed.session;
   const c = feed.sample('cube', null, at);
-  if (c) setCube(cubeMesh, { x: c.data[0], y: c.data[1], z: c.data[2], yaw: c.data[3], held: c.data[7] > 0.5 }, C.COLOURS[(S.doc.game.colour || 0) % C.COLOURS.length]);
+  if (c) setCube(cubeMesh, { x: c.data[0], y: c.data[1], z: c.data[2], yaw: c.data[3], held: c.data[7] > 0.5 }, C.COLOURS[(S.doc.game.colour || 0) % C.COLOURS.length], ownerOf(S.holder('cube'), null, PLAYER_COLOURS));
   const here = new Set();
   let dist = null;
   for (const p of feed.players()) {
@@ -86,7 +86,7 @@ function frame() {
   if (dist !== null) spots[1].position.set(dist, 0.002, 0);
   const st = feed.status();
   hud.textContent = `${feed.ready ? 'connected' : 'waiting for the server'}, ${st.players} player(s), drawn ${DELAY} ms in the past (?delay=), event ${st.events}, ${st.packets} packets, clock spread ${st.clockSpreadMs === null ? '-' : st.clockSpreadMs.toFixed(1)} ms\n`
-    + `cube: ${c ? `${c.data[0].toFixed(2)}, ${c.data[1].toFixed(2)} m${c.data[7] > 0.5 ? ', held' : ''}, simulated by player ${(S.holder('cube') ?? -1) + 1}` : 'not seen yet'}   count ${S.doc.game.count ?? 0}`;
+    + `cube: ${c ? `${c.data[0].toFixed(2)}, ${c.data[1].toFixed(2)} m${c.data[7] > 0.5 ? ', held' : ''}, simulated by ${(ownerOf(S.holder('cube'), null, PLAYER_COLOURS) || { text: 'nobody' }).text}` : 'not seen yet'}   count ${S.doc.game.count ?? 0}`;
   controls.update();
   renderer.render(scene, camera);
   perf.frames++;
