@@ -216,7 +216,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._socket()
         elif path == "/":
             self.send_response(302)
-            self.send_header("Location", "/" + self.server.index)
+            query = self.path.split("?", 1)[1] if "?" in self.path else ""
+            self.send_header("Location", "/" + self.server.index + ("?" + query if query else ""))
             self.send_header("Content-Length", "0")
             self.end_headers()
         elif path == "/info":

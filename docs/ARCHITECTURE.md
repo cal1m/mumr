@@ -59,6 +59,13 @@ NOTES 1, 2026-10-22).
 | `client/body.js` | a Body: claim on reach, busy while touching, send at a rate (slow when still), take only the holder's, `ask`/`do`, keyframes; policies `touch` and `owner` | session, wire |
 | `client/worldfeed.js` | a viewer: the document (a Session) plus every stream by server time, interpolated | session, wire, link |
 | `client/life.js` | the page's life log: numbered lines to `/log` at once (keepalive), resent, last lines in sessionStorage | - |
+| `client/hands.js` | a hand's 25 joints as a source on the floor plan, the pinch (select event, or tips < 22 mm, let go at 35 mm), fingertips for the line-up | - |
+| `client/follow.js` | where this player's menu floats: it stays while you are near and follows you on a lead when you walk away | - |
+| `client/menus.js` | menu layouts (`grid`), the hit test, panel axes, `Poke` (a fingertip through a button from the front), `Menus` (everyone's panel poses and info through `M`) | session, wire, align |
+| `client/anchor.js` | `Keeper`: the persistent anchor, reset events, settle, found again by its handle (the 10-22 fix) | util, align |
+| `client/lineup.js` | `LineUp`: Aligner + keeper + session + saving, its buttons (`lineUp`, `p1create` ...), rows and info for the menu, marks to draw | align, session, anchor |
+| `client/all.js` | the browser's one-tag loader for all of the above | - |
+| `client/xr/*.js` | ES modules, THREE handed in: `session.js` (enter MR, resets, the `shared` probe, the anchor's XR calls), `input.js` (hands and controllers from the frame), `ghost.js` (ghost fingers), `players3d.js` (the others' hands and heads, line-up marks and knobs), `panel3d.js` (a menu panel drawn from a grid) | the plain files |
 
 ## 4. The packets
 

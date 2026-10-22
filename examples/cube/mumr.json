@@ -1,0 +1,6 @@
+{
+  "title": "MUMR cube",
+  "index": "index.html",
+  "bodies": ["cube"],
+  "owned": { "16": "cube" }
+}

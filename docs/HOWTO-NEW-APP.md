@@ -61,6 +61,21 @@ link.onBin = (b) => { const p = MUMR.wire.decode(b); if (p.name === 'presence') 
 - Requests from a page that does not hold the body: `ball.ask('place', { x, y })` in the common frame.
 - Packet types 1-255; 2 and 4 are the engine's.
 
+## 3b. Menus, lining up, XR
+
+`examples/cube/app.js` is the worked example. The pieces:
+
+- `new MUMR.lineup.LineUp(session, space, { store: localStorage, say, life })`; add `MUMR.lineup.ACTIONS` to the session's `actions`
+  and call `lineup.press(id)` from the `action` listener; when mixed reality starts, `lineup.restart()` and
+  `lineup.setKeeper(new MUMR.anchor.Keeper(xr.anchorIO('myapp.anchor')))`, and `keeper.update()` every XR frame.
+- `enterXR({ renderer, life, onReset: (F) => keeper.reset(F), onEnd })` (`/mumr/xr/session.js`), then every frame
+  `xr.frame = frame` and `readInput(xr, frame, space, pinch)` (`/mumr/xr/input.js`) for the sources and the fingertips.
+- A menu is a layout function of **its owner's state and info**: `layout(session.stateOf(slot), info)`. This page sends its own panel
+  poses and info with `menus.send(now, panels, Object.assign(lineup.info(), ...))`; the others' come from `menus.others(now)`.
+  Test the fingertips against all of them with one `Poke`, and press with `session.press(owner, id)`.
+- Draw with `makePanels(THREE, renderer)`, `createPlayers({ THREE, world, scene, GhostHand })`, `makeGhost(THREE)`.
+- On the desktop, a pretend line-up `lineup.given({ x, y, yaw })` lets two tabs share a world.
+
 ## 4. Coordinates
 
 Make one `new MUMR.align.Space(frame, floorY)` per page and update it when the line-up or the floor changes. Use it for everything that is

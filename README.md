@@ -5,8 +5,9 @@ nothing installed), see the same virtual things in the same real places, and tou
 the pages and keeps the shared state; PC pages can watch the whole world live.
 
 Extracted from **Nudgy** (KTE Project2, a toy loco tried out in mixed reality), where it ran on two headsets from 2026-10-13 to 2026-10-22.
-**Status 2026-10-22:** the core without THREE is extracted and tested (58 Node tests, 39 Python tests) and a counter example runs in two
-browser tabs. The XR parts (hands, line-up UI, anchors) and the first XR example are next; nothing of MUMR has run on a headset yet.
+**Status 2026-10-22:** the core, everyone's menus, the XR parts (hands, line-up, anchor keeper, ghost hands, panels) and the cube demo
+are built and tested (70 Node tests, 39 Python tests); the counter and the cube were rehearsed in browser tabs with the PC view. **Nothing
+of MUMR has run on a headset yet**: the cube is ready for that ([examples/cube/README.md](examples/cube/README.md)).
 See [docs/PLAN.md](docs/PLAN.md).
 
 ## The idea
@@ -32,10 +33,12 @@ Open `http://localhost:8766/` in two tabs. Press +1 in one and watch the other. 
 
 ```
 server/    ws.py  hub.py  serverlog.py  serve.py        Python 3, standard library only
-client/    util link align wire session presence body worldfeed life (+ index.js for Node)   plain scripts, no build step
+client/    util link align wire session presence body worldfeed life hands follow menus anchor lineup   plain scripts, no build step
+           all.js (one tag for the browser), index.js (Node)
+client/xr/ session input ghost players3d panel3d   ES modules for WebXR, THREE handed in
 test/      Node tests (hubfake.js: a pretend server for several pretend headsets in one process)
 server/tests/   Python tests
-examples/  counter (no XR)
+examples/  counter (no XR), cube (the XR demo, with a PC view)
 docs/      ARCHITECTURE.md  HOWTO-NEW-APP.md  PLAN.md  NOTES.md (what was learnt, and what was streamlined)
 ```
 

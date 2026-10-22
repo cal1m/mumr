@@ -53,6 +53,8 @@ class ServeTest(unittest.TestCase):
     def test_the_app_and_the_engine_are_served(self):
         self.assertEqual(self.get("/index.html"), (200, b"<p>hi</p>"))
         self.assertEqual(self.get("/"), (200, b"<p>hi</p>"), "/ goes to the index page")
+        with urllib.request.urlopen(self.base + "/?name=A&frame=0,0,0", timeout=5) as r:
+            self.assertTrue(r.url.endswith("/index.html?name=A&frame=0,0,0"), r.url)
         code, body = self.get("/mumr/link.js")
         self.assertEqual(code, 200)
         self.assertIn(b"connect", body)

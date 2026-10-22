@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MUMR cube</title>
+<style>
+  :root { --bg: #14161c; --card: #1e222c; --text: #ece9e2; --dim: #9aa3b2; --line: #39404f; --accent: #4ea1ff; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+  header { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 19px; margin: 0; }
+  header a { color: var(--accent); }
+  button { font: 600 15px system-ui, sans-serif; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; }
+  button.go { background: var(--accent); color: #0b0d12; border-color: var(--accent); }
+  #view { display: block; width: 100%; height: calc(100vh - 160px); min-height: 320px; touch-action: none; }
+  #status { margin: 0; padding: 8px 16px; color: var(--dim); font: 12px/1.45 ui-monospace, monospace; white-space: pre-wrap; max-height: 104px; overflow: auto; }
+  #say { margin-left: auto; color: var(--text); }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+</script>
+<script src="/mumr/all.js"></script>
+<script src="cube.js"></script>
+</head>
+<body>
+<header>
+  <h1>MUMR cube</h1>
+  <button id="enter" class="go" hidden>Enter mixed reality</button>
+  <span id="xrNote"></span>
+  <a href="view.html" target="_blank">PC view of the world</a>
+  <span id="say"></span>
+</header>
+<canvas id="view"></canvas>
+<pre id="status"></pre>
+<script type="module" src="app.js"></script>
+</body>
+</html>

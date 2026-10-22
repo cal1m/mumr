@@ -75,6 +75,15 @@ Each item: what is there now in Nudgy, why it costs, what MUMR does instead. **D
 18. **The hub's hello to a player now carries the document and the newest packets** (as a viewer's did). A joiner sees the world at once
     without asking anyone, and bodies at rest need not keep sending for a newcomer to see them. **Done.**
 
+19. **The redirect from `/` lost the page's query** (found 2026-10-22 rehearsing the cube: `?name=A&frame=0,0,0` never arrived).
+    Fixed in `serve.py`, with a test.
+20. **The demo app is longer than the plan's 150 lines** (235 lines plus 155 for the cube). The parts every app writes again: the
+    desktop rehearsal (mouse as a fingertip, clicks on panels), keeping a `Panel` per menu in step with `menus.others()`, easing the
+    other players' panels, the frame loop's order (input, line-up, presence, bodies, menus, draw). A small `xr/app.js` helper could
+    carry them. Not done: wait for the headset run before deciding what the helper should hold.
+21. **A menu is a function of its owner's state and info**, for this player's menu, another player's and the PC view alike
+    (`cube.menu(state, info)`): one layout, drawn three ways. That is the generic form of Nudgy's M4 rule.
+
 ## 3. Things that must not be lost (from the Nudgy build)
 
 Kept from the first plan's section 6, plus what came after it:
@@ -98,6 +107,19 @@ Kept from the first plan's section 6, plus what came after it:
 4. More than two players: the wire allows four slots; nothing above two has run.
 5. `dbg.mp.sharedSpace` (does the Quest Browser offer a `shared` reference space?) was recorded in every run and never read. If yes, line-up could be automatic.
 
+### Answers (Marek, 2026-10-22)
+
+1. The repo becomes **public under MIT when he says so** (not before).
+2. He will run the three experiments later (he is away): work around them for now.
+3. Nudgy does **not** move onto MUMR now.
+4. Look into the `shared` reference space, but the touched-spots line-up is good enough for now. Findings: it is behind a Quest Browser
+   flag (`chrome://flags`, "WebXR experiments"), the page must list `"shared"` in `optionalFeatures` (Nudgy did, in its first try), the
+   browser may give a placeholder space for a second or two and then a `reset` (none for the first headset in the room), the space has a
+   UUID that is empty until it has settled, and it is per site and room-sized ([UploadVR](https://www.uploadvr.com/quest-web-browser-experimental-colocation-webxr/),
+   [dmnshd.gg](https://dmnshd.gg/blog/webxr-shared-spaces)). Nudgy's answer was never written to a log (it lived only in the page's
+   debug snapshot, which the relay does not keep). The MUMR XR start asks for it and writes the outcome to the server log; using it as
+   the common frame is an option behind `?shared=1`, untried.
+
 ## 5. Log
 
 - **2026-10-22** Read the MR chats (17 transcripts in the Project2 folder, user messages in full, Claude's replies cut to 500 characters;
@@ -107,5 +129,11 @@ Kept from the first plan's section 6, plus what came after it:
   presence, body, worldfeed, life new). 58 Node tests (net.test.js against the real server), 39 Python tests. The presence packet is
   byte for byte Nudgy's (checked against a packet made by Nudgy's own wire.js). `examples/counter` checked in two tabs in the browser
   pane: the second tab took the world from the server, settings and an owned note crossed, the note went with its tab; it found item 17.
-- Not done: anything with THREE or WebXR; nothing has run on a headset; Nudgy is untouched (except a pointer at the top of its old
+- Not done then: anything with THREE or WebXR; nothing has run on a headset; Nudgy is untouched (except a pointer at the top of its old
   extraction plan).
+- **2026-10-22 (later)** Marek: build the menus, the XR parts and a demo for him to try later. Built phases 2-4 (PLAN): `hands`,
+  `follow`, `menus`, `anchor`, `lineup`, `all.js`, `xr/*`, `examples/cube` with a PC view. 70 Node and 39 Python tests. Rehearsed
+  in the browser pane: two tabs with pretend line-ups (B pushed the cube and took the token, A saw it at the same common place:
+  0.729 against 0.73 m; B pressed A's buttons; B's Line up put A into line-up mode and B saw it; A lined up with the mouse, 200 cm),
+  and the PC view showed the cube, the count, both heads and both menus. Not ported: Nudgy's depth-only hand mask and the cut-out
+  of the hand in front of a menu (the ghost fingers are drawn over the menus). Nothing has run on a headset.
