@@ -210,7 +210,7 @@ function onFrame(time, frame) {
     hover = r.hover;
     for (const k of r.busy) busyKeys.add(k);
     for (const pr of r.presses) pressed(pr.owner, pr.button, pr.key);
-    if (r.busy.has('own:wrist') || (hover && hover.key === 'own:wrist')) sys.use();      // (a fingertip at the wrist card: it is in use)
+    if (r.at.has('own:wrist')) sys.use();      // (a fingertip at the wrist card itself: it is in use; a hand merely near it is not)
   }
   // the handle under our menu: a pinch that starts at it carries the menu; where it is let go is where it stays (and how far and how high
   // it keeps to us from then on: follow.js place)

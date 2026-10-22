@@ -59,6 +59,8 @@ test('a fingertip through a button from the front presses it once; from behind i
   Q.update([pn], [{ id: 'r', p: at(-0.03) }], 0);
   assert.deepStrictEqual(Q.update([pn], [{ id: 'r', p: at(-0.001) }], 10).presses, [], 'coming from behind');
   assert.ok(step(0.1, 700).busy.has('0:main'), 'a hand near it keeps it from gliding away');
+  assert.ok(!step(0.1, 800).at.has('0:main'), '10 cm away is near, not at it');
+  assert.ok(step(0.03, 900).at.has('0:main'), '3 cm over it is at it');
 });
 
 test('everyone\'s menus: a panel of A floats at the same real place for B, whose frame is turned and shifted', () => {

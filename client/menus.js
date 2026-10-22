@@ -60,9 +60,11 @@
   // within 8 cm of it (so a hand that comes round from behind presses nothing: from behind a menu is a blank wall). One press in 400 ms.
   class Poke {
     constructor(cfg = {}) { this.cfg = Object.assign({ front: 0.004, depth: 0.08, hover: 0.06, busy: 0.25, gap: 400 }, cfg); this.was = new Map(); this.pressedAt = -1e9; }
-    // panels: [{ key, owner, id, pose, w, h (metres), lay, ignore (a tip id that does not press it) }]; tips: [{ id, p: [x, y, z] (XR) }]; -> { presses, hover, busy (Set of keys) }
+    // panels: [{ key, owner, id, pose, w, h (metres), lay, ignore (a tip id that does not press it) }]; tips: [{ id, p: [x, y, z] (XR) }];
+    // -> { presses, hover, busy (keys with a hand within 25 cm: a menu must not glide away from under it), at (keys with a fingertip at
+    //    the card itself: within 5 cm of its face and over it, someone is using it) }
     update(panels, tips, nowMs) {
-      const C = this.cfg, out = { presses: [], hover: null, busy: new Set() };
+      const C = this.cfg, out = { presses: [], hover: null, busy: new Set(), at: new Set() };
       const seen = new Set();
       for (const pn of panels) {
         const A = axes(pn.pose);
@@ -72,6 +74,7 @@
           seen.add(k);
           const u = lx / pn.w + 0.5, v = 0.5 - ly / pn.h, inside = Math.abs(lx) <= pn.w / 2 && Math.abs(ly) <= pn.h / 2;
           if (Math.abs(lz) < C.busy && Math.abs(lx) < pn.w / 2 + 0.15 && Math.abs(ly) < pn.h / 2 + 0.15) out.busy.add(pn.key);
+          if (Math.abs(lz) < 0.05 && Math.abs(lx) < pn.w / 2 + 0.02 && Math.abs(ly) < pn.h / 2 + 0.02) out.at.add(pn.key);
           const id = inside && Math.abs(lz) < C.depth ? hit(pn.lay, u, v) : null, was = this.was.get(k);
           if (id) {
             if (lz > 0 && lz < C.hover) out.hover = { key: pn.key, owner: pn.owner, button: id };
