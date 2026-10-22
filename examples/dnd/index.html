@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MUMR DnD</title>
+<style>
+  body { font: 16px/1.4 system-ui, sans-serif; margin: 24px; background: #111; color: #eee; }
+  button, input { font: inherit; padding: 6px 12px; margin: 4px; }
+  section { border: 1px solid #333; border-radius: 6px; padding: 8px 16px; margin-bottom: 16px; }
+  pre { color: #9a9; font-size: 12px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>MUMR DnD</h1>
+<p>Phase 1: no XR, any browser. Your hero is yours (only your page changes it, and it goes when you leave). Items are shared: anybody
+can give or drop them. Rolls are shared news.</p>
+
+<section>
+  <h2>My hero</h2>
+  <input id="heroName" placeholder="name" value="Hero">
+  <button id="make">Save name / create</button>
+  <p id="mine"></p>
+  <button id="hurt">-1 HP</button>
+  <button id="heal">+1 HP</button>
+</section>
+
+<section>
+  <h2>Heroes here</h2>
+  <p id="heroes"></p>
+</section>
+
+<section>
+  <h2>Items</h2>
+  <input id="itemName" placeholder="item">
+  <button id="addItem">Add item</button>
+  <div id="items"></div>
+</section>
+
+<section>
+  <h2>Rolls</h2>
+  <button id="d20">Roll d20</button>
+  <button id="d6">Roll d6</button>
+  <pre id="rolls"></pre>
+</section>
+
+<pre id="status"></pre>
+<script src="/mumr/util.js"></script>
+<script src="/mumr/link.js"></script>
+<script src="/mumr/align.js"></script>
+<script src="/mumr/wire.js"></script>
+<script src="/mumr/session.js"></script>
+<script src="/mumr/life.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
