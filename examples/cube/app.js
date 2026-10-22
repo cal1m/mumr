@@ -185,6 +185,7 @@ function onFrame(time, frame) {
   body.send(now);
   // the menus: ours follows us in mixed reality and stands still on the desktop; everybody's can be pressed
   if (!follower.pose) { if (xr) follower.snap({ x: head[0], y: head[1], th: head[2], py: head[3] + space.floorY }); else follower.set({ x: 0.9, y: 0.55, h: 0.95, yaw: -2.4, pitch: 0.15 }); }
+  sys.tick();
   const st = S.stateOf(null), sysInfo = sys.info(), ownInfo = { players: S.others + 1, sys: sysInfo };
   const lay = C.menu(st, ownInfo), want = new Set(['own:main']);
   const busyKeys = new Set();
@@ -209,6 +210,7 @@ function onFrame(time, frame) {
     hover = r.hover;
     for (const k of r.busy) busyKeys.add(k);
     for (const pr of r.presses) pressed(pr.owner, pr.button, pr.key);
+    if (r.busy.has('own:wrist') || (hover && hover.key === 'own:wrist')) sys.use();      // (a fingertip at the wrist card: it is in use)
   }
   // the handle under our menu: a pinch that starts at it carries the menu; where it is let go is where it stays (and how far and how high
   // it keeps to us from then on: follow.js place)

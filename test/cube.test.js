@@ -110,4 +110,15 @@ test('the wrist menu: its buttons act at its owner, Line up opens it, and it sho
   pose = pose || sys.place(head, jp, 0) || sys.place(head, flipped, 0);
   assert.ok(pose && Number.isFinite(pose.yaw) && pose.h > 1, JSON.stringify(pose));
   assert.strictEqual(sys.place(head, null, 0), null, 'no hand: no menu');
+  // open and unused for a minute: it folds by itself (not while lining up)
+  let t = 0;
+  const S2 = new M.session.Session(null, {}), L2 = new M.lineup.LineUp(S2, new M.align.Space(null, 0)), said = [];
+  const s2 = new M.sysmenu.SysMenu(S2, L2, { now: () => t, say: (x) => said.push(x) });
+  s2.press('sysOpen'); t = 59000; s2.tick();
+  assert.strictEqual(s2.open, true);
+  s2.use(); t = 118000; assert.strictEqual(s2.tick(), false, 'a fingertip at it a minute ago');
+  t = 120500; assert.strictEqual(s2.tick(), true); assert.strictEqual(s2.open, false);
+  s2.press('lineUp'); t = 400000; s2.tick();
+  assert.strictEqual(s2.open, true, 'not while lining up');
+  assert.strictEqual(said.length, 1);
 });

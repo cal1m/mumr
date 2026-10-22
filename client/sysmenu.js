@@ -2,7 +2,8 @@
 // of the menu are engine-essential ... a wrist based popup that minimizes into a wrist button"). No THREE and no DOM.
 //
 //   folded    a small round button on the wrist ("MUMR"), shown while the inside of the wrist looks at you
-//   open      Line up (and while lining up the three spot rows with Create / Delete / Lock, and Done), Room setup, Exit; "-" folds it
+//   open      Line up (and while lining up the three spot rows with Create / Delete / Lock, and Done), Room setup, Exit; "-" folds it;
+//             a minute without a press or a fingertip at it (and not lining up), it folds by itself
 // Like every menu it is shared: it goes out in the `M` packet as panel 'wrist' with its state in info.sys, the other players see it on its
 // owner's wrist and may press it, and a press acts for the owner (session.press). The app's own menu is separate (the app's layout).
 //
@@ -14,15 +15,27 @@
 (function (M) {
   const OWN = ['sysOpen', 'sysClose', 'exit', 'roomSetup'];
   const OPEN_W = 0.22, FOLDED_W = 0.06;
+  const AUTO_FOLD = 60000;      // ms open and unused before it folds by itself
   const WRIST_SIDE = 'left';
 
   class SysMenu {
     constructor(session, lineup, opts = {}) {
       this.session = session; this.lineup = lineup; this.opts = opts;
       this.open = false; this.shown = false; this.pose = null;
+      this.now = opts.now || M.util.nowMs; this.usedAt = this.now();
     }
     static get ACTIONS() { return OWN.concat(M.lineup.ACTIONS); }
+    // a fingertip at the card (or a press): it is being used. Open and unused for AUTO_FOLD it folds by itself (it may only be in view because
+    // of where the wrist happens to be), but not while lining up (a spot can take a while)
+    use() { this.usedAt = this.now(); }
+    tick() {
+      if (!this.open || (this.lineup && this.lineup.active) || this.now() - this.usedAt < AUTO_FOLD) return false;
+      this.open = false;
+      if (this.opts.say) this.opts.say('The wrist menu folded itself (not used for a minute)');
+      return true;
+    }
     press(id) {
+      this.use();
       if (id === 'sysOpen') { this.open = true; return true; }
       if (id === 'sysClose') { this.open = false; return true; }
       if (id === 'exit') { if (this.opts.exit) this.opts.exit(); return true; }
@@ -63,12 +76,10 @@
       const W = M.follow.WRIST;
       this.shown = c.dist < W.far && c.facing > (this.shown ? W.hide : W.show);
       if (!this.shown) return (this.pose = null);
-      // (open, the card is larger: its middle goes a little further up the forearm, so that it does not cover the hand)
-      const arm = [at(0)[0] - at(11)[0], at(0)[1] - at(11)[1], at(0)[2] - at(11)[2]], al = Math.hypot(arm[0], arm[1], arm[2]) || 1, k = this.open ? 0.07 : 0;
-      const p = [0, 1, 2].map((i) => c.pos[i] + (arm[i] / al) * k);
+      const p = c.pos;                                 // (open or folded, the card has its middle at the same point: it opens round the button)
       return (this.pose = { x: p[0], y: -p[2], h: p[1], yaw: 0, pitch: 0, q: M.align.quatFromBasis(c.right, c.up, c.normal) });
     }
   }
 
-  M.sysmenu = { SysMenu, OPEN_W, FOLDED_W, WRIST_SIDE };
+  M.sysmenu = { SysMenu, OPEN_W, FOLDED_W, WRIST_SIDE, AUTO_FOLD };
 })(typeof module !== 'undefined' ? (module.exports = require('./ns.js')) : (globalThis.MUMR = globalThis.MUMR || {}));
