@@ -13,7 +13,7 @@ import { makeCube, setCube, ownerOf } from './draw.js';
 
 const M = window.MUMR, C = window.CUBE, cube = new C.Cube(), cubeMesh = makeCube(THREE, C.SIZE);
 const owner = (S) => (S.connected ? ownerOf(S.holder('cube'), S.me, PLAYER_COLOURS) : null);
-let pointers = null, pointing = [];
+let pointers = null, pointing = [], cubeTarget = null;
 
 // The pointing demo: every pointing hand in the world (this player's and the others', from their joints: nothing is sent for it) gets a
 // ray to what it points at, the cube or a part of the room, with a sign saying what that is; the cube's edges turn yellow while
@@ -33,6 +33,20 @@ const app = await createApp({
   menu: C.menu,
   feet: 'off',                  // (the engine's feet: off here)
   handWall: true,               // (the hand window on the room's longest wall, with what the engine makes of every hand)
+  // the room model (from the menu): the cube can be moved in it (the viewer is the engine's); a hand in it may be shown full size
+  roomModel: {
+    open: (st) => !!st.model, handIrl: (st) => !!st.handIrl,
+    things: () => {
+      const d = cube.drawn();
+      return [{ id: 'cube', label: 'cube', kind: 'box', at: [d.x, d.y, d.z], yaw: d.yaw, size: [C.SIZE], colour: C.COLOURS[(app.S.game('colour') || 0) % C.COLOURS.length], preview: cubeTarget,
+        drag: (phase, at) => {
+          cubeTarget = phase === 'drop' ? null : at;
+          if (phase !== 'drop') return;
+          const { space } = app, c = space.ok ? space.toCommon(at) : at;
+          app.bodies[0].ask('put', { x: c[0], y: c[1], z: Math.max(C.HALF, c[2]) });
+        } }];
+    },
+  },
   bodies: ({ space }) => [{ token: 'cube', type: 'cube', adapter: C.adapter(cube, space) }],
   setup: ({ world }) => { world.add(cubeMesh, cubeMesh.userData.holder); pointers = createPointers({ THREE, parent: world }); },
   step: (dt, t, hands) => { cube.room = app.room.local(); cube.cfg.kick = app.feet === 'kick'; cube.step(dt, t, hands); },

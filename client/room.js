@@ -216,9 +216,44 @@
     if (dir[2] < -1e-6) take(-from[2] / dir[2], 'floor', 'floor');
     return best;
   }
+  // A place on a wall for a flat thing of size { w, h } (a window: the hand wall's viewer). Without `near`: the middle of the longest wall,
+  // its middle `h0` up. With `near` ([x, y, z], floor plan): on the wall nearest to it, where it is along the wall and how high (kept on
+  // the wall: a viewer can only be put onto a wall). Off the wall by `off`, on the room's side. -> { x, y, h, yaw (the way it faces, a
+  // heading on the floor plan) } or null when the room has no wall.
+  function wallSpot(room, size, near, h0 = 1.35, off = 0.02) {
+    const ws = room ? prep(room).walls : [];
+    if (!ws.length) return null;
+    const len = (w) => Math.hypot(w.x1 - w.x0, w.y1 - w.y0);
+    let w, t, h;
+    if (near) {
+      let best = Infinity;
+      for (const q of ws) {
+        const dx = q.x1 - q.x0, dy = q.y1 - q.y0, L2 = dx * dx + dy * dy, u = Math.max(0, Math.min(1, ((near[0] - q.x0) * dx + (near[1] - q.y0) * dy) / L2));
+        const d = Math.hypot(near[0] - (q.x0 + dx * u), near[1] - (q.y0 + dy * u));
+        if (d < best) { best = d; w = q; t = u; }
+      }
+      h = near[2];
+    } else { w = ws.reduce((a, b) => (len(b) > len(a) ? b : a)); t = 0.5; h = h0; }
+    const L = len(w), m = Math.min(0.5, (size.w / 2) / L);
+    t = Math.max(m, Math.min(1 - m, t));
+    h = Math.max(Math.min(w.lo + size.h / 2 + 0.3, w.hi - size.h / 2), Math.min(w.hi - size.h / 2, h));
+    let cx = 0, cy = 0, n = 0;                                 // (the room's side: towards the middle of everything in the room)
+    for (const pl of room.planes) for (const p of pl.p) { cx += p[0]; cy += p[1]; n++; }
+    cx /= n; cy /= n;
+    const px = w.x0 + (w.x1 - w.x0) * t, py = w.y0 + (w.y1 - w.y0) * t;
+    let nx = -(w.y1 - w.y0) / L, ny = (w.x1 - w.x0) / L;
+    if (nx * (cx - px) + ny * (cy - py) < 0) { nx = -nx; ny = -ny; }
+    return { x: px + nx * off, y: py + ny * off, h, yaw: Math.atan2(ny, nx) };
+  }
+  // the document's kind for where the viewer hangs (any page may move it; the last move stands): { k: 'wallspot', x, y, h, yaw } in the
+  // common frame; createApp and a PC view add it to their session's kinds
+  const SPOT_KIND = {
+    keep: () => ({ key: 'wallspot' }),
+    apply(S, e) { if ([e.x, e.y, e.h, e.yaw].every(Number.isFinite)) { S.doc.wallspot = { x: e.x, y: e.y, h: e.h, yaw: e.yaw }; S.notify('wallspot', S.doc.wallspot); } },
+  };
   const walls = (room) => (room ? prep(room).walls : []);
   const surfaces = (room) => (room ? prep(room).tops : []);
   const blocks = (room) => (room ? prep(room).blocks : []);
 
-  M.room = { Room, ACTIONS, fromXR, mapRoom, kind, support, ceiling, pushOut, cast, walls, surfaces, blocks, TABLE_T, SOLID_MIN };
+  M.room = { Room, ACTIONS, fromXR, mapRoom, kind, support, ceiling, pushOut, cast, wallSpot, SPOT_KIND, walls, surfaces, blocks, TABLE_T, SOLID_MIN };
 })(typeof module !== 'undefined' ? (module.exports = require('./ns.js')) : (globalThis.MUMR = globalThis.MUMR || {}));

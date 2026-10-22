@@ -66,10 +66,11 @@ NOTES 1, 2026-10-22).
 | `client/lineup.js` | `LineUp`: Aligner + keeper + session + saving, its buttons (`lineUp`, `p1create` ...), rows and info for the menu, marks to draw | align, session, anchor |
 | `client/room.js` | the room: a headset's planes on its floor plan, the server's room in the common frame (uploaded once by the first headset when the server has none, or by the Upload button); `kind` (table, solid, wall ...), `support`, `ceiling` and `pushOut` for an app's physics | session, align |
 | `client/grab.js` | the gestures of a hand, for any app: a pinch and a fist (grips), pointing (a ray, and what it hits: `pointAt`), a flat hand as a platform (palm up or down), from anybody's hand sources | hands, room |
+| `client/model.js` | the room model: a small copy of the room to move things in (scale, the way between the room and the model, its handles, this page's hands at every open model) | grab, util |
 | `client/sysmenu.js` | the engine's own menu on the inside of the left wrist (folded: a wrist button; open: Line up with its spot rows, Room setup, Exit), shared like every menu (panel `wrist`, state in the menus' info.sys) | lineup, menus, follow |
 | `client/host.js` | the host process (Node): the app's own simulation on the PC, holding what nobody touches | everything plain |
 | `client/all.js` | the browser's one-tag loader for all of the above | - |
-| `client/xr/*.js` | ES modules, THREE handed in: `session.js` (enter MR, resets, the `shared` probe, the anchor's XR calls), `input.js` (hands and controllers from the frame), `ghost.js` (ghost fingers), `players3d.js` (the others' hands, heads and feet, line-up marks and knobs), `panel3d.js` (a menu panel drawn from a grid), `room3d.js` (the room's outlines), `feet3d.js` (shoes), `handmask.js` (the hand cutouts), `handwall.js` (the hand window on a wall), `pointer3d.js` (pointing rays), `app.js` (createApp) | the plain files |
+| `client/xr/*.js` | ES modules, THREE handed in: `session.js` (enter MR, resets, the `shared` probe, the anchor's XR calls), `input.js` (hands and controllers from the frame), `ghost.js` (ghost fingers), `players3d.js` (the others' hands, heads and feet, line-up marks and knobs), `panel3d.js` (a menu panel drawn from a grid), `room3d.js` (the room's outlines), `feet3d.js` (shoes), `handmask.js` (the hand cutouts), `handwall.js` (the hand window on a wall), `pointer3d.js` (pointing rays), `roommodel3d.js` (the room model), `app.js` (createApp) | the plain files |
 
 ## 4. The packets
 

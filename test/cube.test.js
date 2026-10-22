@@ -81,7 +81,7 @@ test('two headsets: B pushes the cube, takes the token by touching it, and A see
 
 test('the cube menu has only the cube’s items; the engine items are on the wrist menu', () => {
   const lay = C.menu({ count: 4, colour: 1, ghost: true }, { players: 2 });
-  assert.deepStrictEqual(lay.buttons.filter((q) => q.id).map((q) => q.id), ['plus', 'colour', 'cubeHere', 'ghost']);
+  assert.deepStrictEqual(lay.buttons.filter((q) => q.id).map((q) => q.id), ['plus', 'colour', 'cubeHere', 'ghost', 'model', 'handIrl']);
   assert.strictEqual(lay.buttons.find((q) => q.id === 'plus').value, '4');
   const SM = M.sysmenu.SysMenu;
   const ids = (l) => l.buttons.filter((q) => q.id).map((q) => q.id);

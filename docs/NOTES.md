@@ -130,6 +130,14 @@ Each item: what is there now in Nudgy, why it costs, what MUMR does instead. **D
     shoes (Nudgy's offsets), off unless the app asks (`feet: 'show' | 'kick'`); the hand cutouts are back (`xr/handmask.js`, Nudgy's
     mask with its 24 mm tip reach and 3 mm growth), on unless the app turns them off. Not yet on a headset: the gesture thresholds
     are Nudgy's or estimates, and the hand wall shows the numbers to tune them by.
+32. **The room model** (Marek, 2026-10-23): from the game's menu, a small copy of the room (the longest side half a metre) with a bar
+    to carry it and a ball to turn it about the vertical; in it the cube and the hand wall's viewer can be picked up (pinch) and put
+    somewhere else, the viewer only onto a wall (the nearest one, at the height it is let go). "Show hand IRL": a hand that reaches into
+    the model is drawn full size in the room where it would be. **Built** (`client/model.js`, `xr/roommodel3d.js`, createApp's
+    `roomModel`): shared like a menu (its pose is panel 'model' of its owner's `M` packet; everybody sees every open model, may move
+    the things in it, and sees its owner's full-size hand; only the owner carries and turns it); where the viewer hangs is the
+    document's `wallspot` (room.js SPOT_KIND), the cube goes by a `put` request to whoever holds it. Found on the way: `[...].every(
+    M.util.num)` passes the index as `num`'s lower limit (the cube's put request was refused); written out instead.
 
 ## 3. Things that must not be lost (from the Nudgy build)
 

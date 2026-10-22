@@ -6,7 +6,8 @@ import { PLAYER_COLOURS } from '/mumr/xr/players3d.js';
 import { makePanels } from '/mumr/xr/panel3d.js';
 import { makeShoes } from '/mumr/xr/feet3d.js';
 import { createRoom3d } from '/mumr/xr/room3d.js';
-import { createHandWall } from '/mumr/xr/handwall.js';
+import { createHandWall, SIZE as WALL_SIZE, wallSpot } from '/mumr/xr/handwall.js';
+import { createModel3d } from '/mumr/xr/roommodel3d.js';
 import { createPointers } from '/mumr/xr/pointer3d.js';
 import { makeCube, setCube, ownerOf } from './draw.js';
 
@@ -27,13 +28,13 @@ const { Panel } = makePanels(THREE, renderer);
 const room3d = createRoom3d({ THREE, parent: world });
 // the hand wall and the pointing rays, as the headsets draw them (worked out here from everybody's joints, as each headset does)
 const handWall = createHandWall({ THREE, parent: world }), pointers = createPointers({ THREE, parent: world }), grips = new M.grab.Grips();
-const hex = (c) => `#${(c >>> 0).toString(16).padStart(6, '0')}`;     // (the room as the supplier sent it: the common frame is this page's floor plan)
+const hex = (c) => `#${(c >>> 0).toString(16).padStart(6, '0')}`, models = new Map();     // (the room as the supplier sent it: the common frame is this page's floor plan)
 const toV = (x, y, z) => new THREE.Vector3(x, z, -y);
 
 const info = await fetch('/info').then((r) => r.json()).catch(() => ({ build: 0 }));
 const life = M.life.make({ name: 'PC view' });
 life(`PC view loaded (${navigator.userAgent.slice(0, 90)})`);
-const feed = M.worldfeed.WorldFeed.connect(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`, { build: info.build, name: 'PC view', session: { game: C.GAME, player: C.PLAYER } });
+const feed = M.worldfeed.WorldFeed.connect(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`, { build: info.build, name: 'PC view', session: { game: C.GAME, player: C.PLAYER, kinds: { wallspot: M.room.SPOT_KIND } } });
 
 // each player: a cone for the head, a dot for every joint and point, two discs for the spots (1 at the origin, 2 at dist along x), the check mark
 const drawn = new Map();
@@ -97,7 +98,20 @@ function frame() {
   }
   for (const [slot, o] of [...drawn]) if (!here.has(slot)) { for (const x of [o.headM, o.dots, o.check]) world.remove(x); for (const q of Object.values(o.panels)) q.panel.dispose(); o.feet.dispose(); drawn.delete(slot); }
   const gestures = grips.update(everyone), roomNow = S.doc.room ? S.doc.room.data : null;
-  handWall.update(roomNow, gestures.map((g) => { const s = everyone.find((q) => q.id === g.id); return { name: `player ${s.slot + 1}, ${/left/.test(g.id) ? 'left' : 'right'}`, colour: hex(PLAYER_COLOURS[s.slot % PLAYER_COLOURS.length]), source: s, g }; }), performance.now());
+  // the room models where the players have them open, with the cube and the viewer in them (the viewer: where the document says)
+  const F = roomNow ? M.model.frameOf(roomNow) : null, spot = S.doc.wallspot || (roomNow ? wallSpot(roomNow) : null), seenModels = new Set();
+  if (F) for (const p of feed.players()) {
+    const m = feed.sample('menus', p.slot), row = m && Array.isArray(m.data.panels) ? m.data.panels.find((r) => r[0] === 'model') : null;
+    if (!row) continue;
+    seenModels.add(p.slot);
+    if (!models.has(p.slot)) models.set(p.slot, createModel3d({ THREE, parent: world }));
+    const things = [];
+    if (c) things.push({ id: 'cube', kind: 'box', at: [c.data[0], c.data[1], c.data[2]], yaw: c.data[3], size: [C.SIZE], colour: C.COLOURS[(S.doc.game.colour || 0) % C.COLOURS.length] });
+    if (spot) things.push({ id: 'viewer', kind: 'panel', at: [spot.x, spot.y, spot.h], yaw: spot.yaw, size: [WALL_SIZE.w, WALL_SIZE.h], colour: 0x4ea1ff });
+    models.get(p.slot).update({ x: row[1], y: row[2], z: row[3], yaw: row[4] }, F, roomNow, things, { edge: PLAYER_COLOURS[p.slot % PLAYER_COLOURS.length] });
+  }
+  for (const [slot, d] of [...models]) if (!seenModels.has(slot)) { d.dispose(); models.delete(slot); }
+  handWall.update(roomNow, gestures.map((g) => { const s = everyone.find((q) => q.id === g.id); return { name: `player ${s.slot + 1}, ${/left/.test(g.id) ? 'left' : 'right'}`, colour: hex(PLAYER_COLOURS[s.slot % PLAYER_COLOURS.length]), source: s, g }; }), performance.now(), S.doc.wallspot || null);
   const box = c ? { id: 'cube', label: 'cube', x: c.data[0], y: c.data[1], z: c.data[2], half: C.HALF, yaw: c.data[3] } : null;
   pointers.update(gestures.filter((g) => g.point).map((g) => {
     const hit = M.grab.pointAt(g.point, box ? [box] : [], roomNow, 8), s = everyone.find((q) => q.id === g.id);

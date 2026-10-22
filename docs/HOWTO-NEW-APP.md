@@ -60,7 +60,8 @@ link.onBin = (b) => { const p = MUMR.wire.decode(b); if (p.name === 'presence') 
   (`pinch` or `fist`, `start`, `end`, `at`), `point` (a ray; `MUMR.grab.pointAt(ray, boxes, room)` says what it hits), `palm` (a flat
   hand to put things on, `face` up or down) and `gesture`, from everybody's sources; the app decides what they do. Options of
   `createApp`: `feet` ('off', 'show', 'kick'), `handMask` (the hand cutouts, on), `handWall` (the hand window on a wall, off),
-  `ghostColour: 'grips'`. The room: `app.room.local()`, and
+  `ghostColour: 'grips'`, `roomModel` (a small copy of the room in which the app's things and the viewer can be moved: see the
+  cube's `app.js`; open and the full-size hand are two player settings the app's menu toggles). The room: `app.room.local()`, and
   `MUMR.room.support / ceiling / pushOut` for physics (move in steps shorter than the thing's radius and pass `from`: nothing goes
   through a wall). `examples/cube/cube.js` uses all of it.
 - Every page simulates every body with **everybody's** hands, including what is derived from them (Nudgy's palm platform: the other

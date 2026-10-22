@@ -2,27 +2,19 @@
 // gestures (grab.js) make of it: the gesture, the pinch gap, how far each fingertip is from the palm, how straight the index is, the
 // palm's tilt and which side is up. For trying gestures out and tuning them (Marek, 2026-10-23). An ES module; THREE handed in.
 //
-// Where: the longest wall of the room, in its middle, WALL_H up, a little off the wall on the room's side. The room is the server's (the
-// same for every player), so every player and the PC view see the window in the same place, showing the same hands: no packets.
+// Where: by default the longest wall of the room, in its middle, WALL_H up, a little off the wall on the room's side; a player may move it
+// to another wall in the room model (model.js), and then it hangs where the document's `wallspot` says (room.js SPOT_KIND). The room is
+// the server's, so every player and the PC view see the window in the same place, showing the same hands.
 //   const w = createHandWall({ THREE, parent });   parent: the floor group (inside it the floor plan (x, y, z) is THREE (x, z, -y))
-//   w.update(room, hands, nowMs)   hands: [{ name, colour, source, g (that source's Grips state) }]; at most 4 are shown
+//   w.update(room, hands, nowMs, spot)   hands: [{ name, colour, source, g (that source's Grips state) }], at most 4 are shown; spot
+//                                        (floor plan) or null: the default
 const W = 1.0, H = 0.56, WALL_H = 1.35, OFF = 0.02, PX = 1024, PY = 574, EVERY = 100;
 const BONES = [[0, 1, 2, 3, 4], [0, 5, 6, 7, 8, 9], [0, 10, 11, 12, 13, 14], [0, 15, 16, 17, 18, 19], [0, 20, 21, 22, 23, 24], [5, 10, 15, 20]];
 const COL = { pinch: '#2e8b57', fist: '#d9822b', point: '#f2c14e', flat: '#4ea1ff', open: '#9aa3b5', none: '#6b7280' };
 
-// where on the wall: -> { x, y, h, yaw (THREE rotation about Y) } on the floor plan, or null when the room has no wall
-export function wallSpot(room) {
-  const M = globalThis.MUMR, walls = M.room.walls(room);
-  if (!walls.length) return null;
-  const w = walls.reduce((a, b) => (Math.hypot(b.x1 - b.x0, b.y1 - b.y0) > Math.hypot(a.x1 - a.x0, a.y1 - a.y0) ? b : a));
-  let cx = 0, cy = 0, n = 0;                                 // (the room's side: towards the middle of everything in the room)
-  for (const pl of room.planes) for (const p of pl.p) { cx += p[0]; cy += p[1]; n++; }
-  cx /= n; cy /= n;
-  const mx = (w.x0 + w.x1) / 2, my = (w.y0 + w.y1) / 2, dx = w.x1 - w.x0, dy = w.y1 - w.y0, L = Math.hypot(dx, dy);
-  let nx = -dy / L, ny = dx / L;
-  if (nx * (cx - mx) + ny * (cy - my) < 0) { nx = -nx; ny = -ny; }
-  return { x: mx + nx * OFF, y: my + ny * OFF, h: WALL_H, yaw: Math.atan2(nx, -ny) };
-}
+// where on the wall by default (room.js wallSpot: the middle of the longest wall): { x, y, h, yaw (heading of its front) } or null
+export const SIZE = { w: W, h: H };
+export function wallSpot(room, near) { return globalThis.MUMR.room.wallSpot(room, SIZE, near, WALL_H, OFF); }
 
 export function createHandWall({ THREE, parent }) {
   const canvas = document.createElement('canvas'); canvas.width = PX; canvas.height = PY;
@@ -30,7 +22,7 @@ export function createHandWall({ THREE, parent }) {
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
   mesh.visible = false; parent.add(mesh);
   const ctx = canvas.getContext('2d');
-  let at = -1e9, shownRoom = null;
+  let at = -1e9, shownRoom = null, shownSpot = null;
 
   // one hand in its own frame: the wrist at the bottom, the middle knuckle straight up, the palm facing you
   function drawHand(x0, y0, w, h, src, colour) {
@@ -68,14 +60,16 @@ export function createHandWall({ THREE, parent }) {
     });
     tex.needsUpdate = true;
   }
-  return {
-    mesh,
-    update(room, hands, now) {
-      if (room !== shownRoom) {
-        shownRoom = room;
-        const s = room ? wallSpot(room) : null;
+  const api = {
+    mesh, spot: null,
+    update(room, hands, now, spot) {
+      const key = spot ? `${spot.x},${spot.y},${spot.h},${spot.yaw}` : '';
+      if (room !== shownRoom || key !== shownSpot) {
+        shownRoom = room; shownSpot = key;
+        const s = spot || (room ? wallSpot(room) : null);
         mesh.visible = !!s;
-        if (s) { mesh.position.set(s.x, s.h, -s.y); mesh.rotation.set(0, s.yaw, 0); }
+        if (s) { mesh.position.set(s.x, s.h, -s.y); mesh.rotation.set(0, Math.atan2(Math.cos(s.yaw), -Math.sin(s.yaw)), 0); }
+        api.spot = s;
       }
       if (!mesh.visible || now - at < EVERY) return;
       at = now;
@@ -83,4 +77,5 @@ export function createHandWall({ THREE, parent }) {
     },
     dispose() { parent.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); tex.dispose(); },
   };
+  return api;
 }

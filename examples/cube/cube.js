@@ -203,6 +203,14 @@
       this.off.x *= k; this.off.y *= k; this.off.z *= k; this.off.yaw *= k;
     }
     place(x, y) { this.x = x; this.y = y; this.z = HALF; this.vx = this.vy = this.vz = this.wz = 0; this.held = null; this.onHand = null; }
+    // put somewhere in the room (the room model): at (x, y), its middle at least at z, out of any wall or object; it then falls onto
+    // whatever is under it
+    put(x, y, z) {
+      this.place(x, y);
+      this.z = Math.max(HALF, z);
+      const w = M.room.pushOut(this.room, this.x, this.y, this.z - HALF + 0.005, this.z + HALF - 0.005, R);
+      if (w) { this.x = w.x; this.y = w.y; }
+    }
     moving() { return !!this.held || !!this.onHand || Math.hypot(this.vx, this.vy, this.vz) > 0.002 || Math.abs(this.wz) > 0.01 || this.z > this.ground + 1e-3; }
     drawn() { return { x: this.x + this.off.x, y: this.y + this.off.y, z: this.z + this.off.z, yaw: this.yaw + this.off.yaw, held: !!this.held }; }
   }
@@ -229,6 +237,7 @@
       settle: () => {},
       do: (what, args) => {
         if (what === 'place' && M.util.num(args.x) && M.util.num(args.y)) { const p = space.ok ? space.fromCommon([args.x, args.y]) : [args.x, args.y]; cube.place(p[0], p[1]); return true; }
+        if (what === 'put' && [args.x, args.y, args.z].every((v) => M.util.num(v))) { const p = space.ok ? space.fromCommon([args.x, args.y, args.z]) : [args.x, args.y, args.z]; cube.put(p[0], p[1], p[2]); return true; }
         return false;
       },
       moving: () => cube.moving(),
@@ -237,12 +246,14 @@
 
   // ---- the menu, for whoever draws it: state = that player's (session.stateOf), info = what its owner says about it (lining up ...)
   const GAME = { count: 0, colour: 0 };
-  const PLAYER = { ghost: true };
+  const PLAYER = { ghost: true, model: false, handIrl: false };
   const ACTIONS = ['cubeHere'];                    // (the app's own; the engine's are client/sysmenu.js SysMenu.ACTIONS)
   function press(id, st) {
     if (id === 'plus') return Object.assign({}, st, { count: st.count + 1 });
     if (id === 'colour') return Object.assign({}, st, { colour: (st.colour + 1) % COLOURS.length });
     if (id === 'ghost') return Object.assign({}, st, { ghost: !st.ghost });
+    if (id === 'model') return Object.assign({}, st, { model: !st.model });
+    if (id === 'handIrl') return Object.assign({}, st, { handIrl: !st.handIrl });
     return null;
   }
   function menu(st, info) {
@@ -251,6 +262,7 @@
       rows: [
         [{ id: 'plus', label: 'Count', value: String(st.count) }, { id: 'colour', label: 'Cube colour', value: COLOURS[st.colour % COLOURS.length].slice(1), active: true }, { id: 'cubeHere', label: 'Cube here', value: 'in front of me' }],
         [{ id: 'ghost', label: 'Ghost fingers', value: st.ghost ? 'shown' : 'hidden', active: !!st.ghost }, { label: 'Players', value: String(info.players || 1) }],
+        [{ id: 'model', label: 'Room model', value: st.model ? 'shown: move the cube or the viewer' : 'hidden', active: !!st.model, span: 2 }, { id: 'handIrl', label: 'Show hand IRL', value: st.handIrl ? 'on' : 'off', active: !!st.handIrl }],
       ] });
   }
 

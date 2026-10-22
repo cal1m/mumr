@@ -21,7 +21,13 @@
 //                                                        everybody, or also given to the app's simulation as sources that may push
 //     handMask: true,                                    (optional) the hand cutouts: real hands in front of everything (default on;
 //                                                        app.handMask.enabled switches them while the page runs)
-//     handWall: false,                                   (optional) the hand window on the room's longest wall (handwall.js)
+//     handWall: false,                                   (optional) the hand window on the room's longest wall (handwall.js); its
+//                                                        place is the document's `wallspot` (room.js SPOT_KIND), moved in the room model
+//     roomModel: { open(state), handIrl(state), things(app) },   (optional) the room model (model.js): open / handIrl say from a
+//                                                        player's state whether that player's model is open and whether their hand
+//                                                        is shown full size in the room when it reaches into it; things: the app's
+//                                                        movable things [{ id, label, kind: 'box', at, yaw, size: [w], colour,
+//                                                        drag(phase, at, preview) }] (the viewer is the engine's)
 //     anchorKey, name })                                 (optional) where the anchor is kept; who this page is in the log
 //   app: { THREE, scene, world, camera, S, space, presence, menus, lineup, sys, room, grips, handMask, feet, life, say, head(), xr(), bodies,
 //          ownerText(slot), gestures (this frame: everybody's hands' grab.js states), everyone (this frame: everybody's hand sources) }
@@ -35,7 +41,8 @@ import { makePanels } from './panel3d.js';
 import { createRoom3d } from './room3d.js';
 import { makeShoes } from './feet3d.js';
 import { createHandMask } from './handmask.js';
-import { createHandWall } from './handwall.js';
+import { createHandWall, SIZE as WALL_SIZE, wallSpot } from './handwall.js';
+import { createModel3d } from './roommodel3d.js';
 
 export { GHOST_COLOURS, PLAYER_COLOURS };
 const HOST = 15, MENU_W = 0.42;
@@ -80,10 +87,10 @@ export async function createApp(o) {
   const link = M.link.connect(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`, { build: info.build, name: NAME });
   link.onNote = (n) => life(`link: ${n}`);
   const sess = o.session || {};
-  const S = new M.session.Session(link, Object.assign({}, sess, { actions: SysMenu.ACTIONS.concat(sess.actions || []) }));
+  const S = new M.session.Session(link, Object.assign({}, sess, { actions: SysMenu.ACTIONS.concat(sess.actions || []), kinds: Object.assign({ wallspot: M.room.SPOT_KIND }, sess.kinds || {}) }));
   const space = new M.align.Space(null, 0);
   const presence = new M.presence.Presence(S, space);
-  const menus = new M.menus.Menus(S, space, { known: (id) => id === 'main' || id === 'wrist' });
+  const menus = new M.menus.Menus(S, space, { known: (id) => id === 'main' || id === 'wrist' || id === 'model' });
   const lineup = new M.lineup.LineUp(S, space, { store: LS, say, life });
   const room = new M.room.Room(S, space, { life, say });
   let xr = null, keeper = null;
@@ -239,16 +246,97 @@ export async function createApp(o) {
     if (o.step) o.step(dt, now / 1000, all, own);
     for (const b of bodies) b.send(now);
     menusFrame(now, dt, head, handsXR, tips);
+    modelFrame(now, own);
     players.update(presence.others(now).map((q) => ({ slot: q.slot, head: q.head, sources: q.sources })), dt);
     players.marks(lineup.marks());
     world.position.y = space.floorY;
     room3d.set(room.local()); room3d.group.visible = !xr || lineup.active;
-    if (handWall) handWall.update(room.local(), wallHands(), now);
+    if (handWall) handWall.update(room.local(), wallHands(), now, viewerPreview || viewerSpot());
     if (xr) handMask.update();
     if (o.draw) o.draw(app, now);
     if (!xr) controls.update();
     renderer.render(scene, camera);
     if (now - statusAt > 300) status(now);
+  }
+  // ---- the viewer's place: the document's wallspot (common frame) in this page's floor plan, or null (the default: the longest wall)
+  let viewerPreview = null;
+  function viewerSpot() {
+    const w = S.doc.wallspot;
+    if (!w) return null;
+    if (!space.ok) return w;
+    const p = space.fromCommon([w.x, w.y, w.h]);
+    return { x: p[0], y: p[1], h: p[2], yaw: space.yawFromCommon(w.yaw) };
+  }
+  // ---- the room models (model.js): this player's (opened from the app's menu), and every other player's where they have it. Everybody
+  // can move the things in any of them; only the owner carries and turns a model. A hand that reaches into a model whose owner has
+  // "hand IRL" on is also drawn full size in the room, where it would be.
+  const RM = o.roomModel || null, modelHands = new M.model.Hands(), model3d = new Map(), bigHands = [];
+  let modelPose = null, modelHot = null;
+  function viewerThing() {
+    const r = room.local(), sp = viewerPreview || viewerSpot() || (r ? wallSpot(r) : null);
+    if (!handWall || !sp) return null;
+    return { id: 'viewer', label: 'viewer', kind: 'panel', at: [sp.x, sp.y, sp.h], yaw: sp.yaw, size: [WALL_SIZE.w, WALL_SIZE.h], colour: 0x4ea1ff,
+      drag(phase, at) {
+        const s = wallSpot(room.local(), at);                           // (the viewer only goes onto a wall: the nearest one to the hand)
+        if (!s) return;
+        viewerPreview = phase === 'drop' ? null : s;
+        if (phase !== 'drop') return;
+        const c = space.ok ? space.toCommon([s.x, s.y, s.h]) : [s.x, s.y, s.h], yaw = space.ok ? space.yawToCommon(s.yaw) : s.yaw;
+        S.emit({ k: 'wallspot', x: +c[0].toFixed(3), y: +c[1].toFixed(3), h: +c[2].toFixed(3), yaw: +yaw.toFixed(4) });
+        life(`viewer moved to (${s.x.toFixed(2)}, ${s.y.toFixed(2)}), ${s.h.toFixed(2)} m up`);
+      } };
+  }
+  function modelFrame(now, own) {
+    const r = room.local(), F = RM && r ? M.model.frameOf(r) : null, models = [];
+    if (F && RM.open(S.stateOf(null))) {
+      if (!modelPose) {
+        const h = head;
+        modelPose = xr ? { x: h[0] + Math.cos(h[2]) * 0.5, y: h[1] + Math.sin(h[2]) * 0.5, z: Math.max(0.6, h[3] - 0.5), yaw: h[2] - Math.PI / 2 } : { x: 0.35, y: 0.1, z: 0.04, yaw: 0 };
+      }
+      models.push({ key: 'own', slot: S.me, mine: true, pose: modelPose });
+    } else modelPose = null;
+    if (F) for (const q of menus.others(now)) {
+      const p = q.panels.find((x) => x.id === 'model');
+      if (p) models.push({ key: `p${q.slot}`, slot: q.slot, mine: false, pose: { x: p.pose.x, y: p.pose.y, z: p.pose.h - space.floorY, yaw: p.pose.yaw } });
+    }
+    const things = F ? (RM.things ? RM.things(app) : []).concat([viewerThing()].filter(Boolean)) : [];
+    for (const m of models) { m.F = F; m.things = things; }
+    // the hands: this page's own reach into any model
+    for (const ev of modelHands.update(lineup.active ? [] : own, models)) {
+      if (ev.what === 'move' || ev.what === 'turn') { modelPose = ev.pose; modelHot = ev.what; continue; }
+      const th = things.find((t) => t.id === ev.id);
+      if (th && th.drag) th.drag(ev.phase, ev.at);
+      if (ev.phase === 'start') life(`room model: took the ${ev.id}`);
+    }
+    if (!modelHands.busy('own')) modelHot = null;
+    // drawing: every open model, with the things where they are (and where a thing being moved here will go)
+    const keys = new Set(models.map((m) => m.key));
+    for (const [k, d] of [...model3d]) if (!keys.has(k)) { d.dispose(); model3d.delete(k); }
+    for (const m of models) {
+      let d = model3d.get(m.key);
+      if (!d) { d = createModel3d({ THREE, parent: world }); model3d.set(m.key, d); }
+      const shown = things.map((t) => ({ id: t.id, kind: t.kind, at: t.at, yaw: t.yaw, size: t.size, colour: t.colour }));
+      for (const t of things) if (t.preview) shown.push({ id: t.id, kind: t.kind, at: t.preview, yaw: t.yaw, size: t.size, colour: t.colour, ghost: true });
+      if (viewerPreview) { const v = things.find((t) => t.id === 'viewer'); if (v) shown.push(Object.assign({}, v, { at: [viewerPreview.x, viewerPreview.y, viewerPreview.h], yaw: viewerPreview.yaw, ghost: true })); }
+      d.update(m.pose, F, r, shown, { handles: m.mine, hot: m.mine ? modelHot : null, edge: m.mine ? undefined : PLAYER_COLOURS[m.slot % PLAYER_COLOURS.length] });
+    }
+    // hand IRL: a hand in a model, full size where it would be in the room (its owner's choice, seen by everybody)
+    let n = 0;
+    for (const m of models) {
+      if (!RM.handIrl || !RM.handIrl(S.stateOf(m.mine ? null : m.slot))) continue;
+      const hs = m.mine ? own : ((presence.others(now).find((q) => q.slot === m.slot) || {}).sources || []);
+      for (const s of hs) {
+        if (!s.joints || s.foot) continue;
+        const tip = s.joints[9], palm = s.joints[10];
+        if (!M.model.inside(m.pose, F, tip, 0.03) && !M.model.inside(m.pose, F, palm, 0.03)) continue;
+        if (!bigHands[n]) { bigHands[n] = new GhostHand(0.35); scene.add(bigHands[n].mesh); }
+        const jp = new Float32Array(75), jr = new Float32Array(25).fill(Math.min(0.12, 0.009 / F.s));
+        s.joints.forEach((q, i) => { const p = M.model.fromModel(m.pose, F, q); jp[i * 3] = p[0]; jp[i * 3 + 1] = p[2] + space.floorY; jp[i * 3 + 2] = -p[1]; });
+        bigHands[n].update(jp, jr, m.mine ? 0xf2c14e : PLAYER_COLOURS[m.slot % PLAYER_COLOURS.length]);
+        n++;
+      }
+    }
+    for (let i = n; i < bigHands.length; i++) bigHands[i].mesh.visible = false;
   }
   // the menus: the app's floats (it follows us in mixed reality and has a handle; it stands still on the desktop), the engine's is on the
   // wrist; everybody's are drawn from their owner's state and can be pressed
@@ -263,6 +351,7 @@ export async function createApp(o) {
     const wristPose = xr ? sys.place(hd, leftHand ? leftHand.jp : null, space.floorY) : { x: 0.55, y: 0.85, h: 0.95, yaw: -2.0, pitch: 0.15 };
     if (wristPose) { want.add('own:wrist'); list.push({ key: 'own:wrist', owner: null, id: 'wrist', pose: wristPose, w: SysMenu.width(sysInfo), lay: SysMenu.layout(sysInfo), ignore: M.sysmenu.WRIST_SIDE }); }
     for (const q of menus.others(now)) for (const p of q.panels) {
+      if (p.id === 'model') continue;                                    // (a room model is not a menu: modelFrame)
       const key = `${q.slot}:${p.id}`, oi = q.info || {}, wrist = p.id === 'wrist';
       const prev = panelsAll.get(key), cur = prev && prev.pose ? prev.pose : p.pose, k = 1 - Math.exp(-dt * 18);
       const eased = { x: cur.x + (p.pose.x - cur.x) * k, y: cur.y + (p.pose.y - cur.y) * k, h: cur.h + (p.pose.h - cur.h) * k, yaw: cur.yaw + M.util.wrap(p.pose.yaw - cur.yaw) * k, pitch: p.pose.pitch };
@@ -293,7 +382,8 @@ export async function createApp(o) {
     }
     if (xr) follower.update(at, dt, busyKeys.has('own:main'));
     list[0].pose = follower.pose;
-    menus.send(now, [{ id: 'main', pose: follower.pose }].concat(wristPose ? [{ id: 'wrist', pose: wristPose }] : []), ownInfo);
+    menus.send(now, [{ id: 'main', pose: follower.pose }].concat(wristPose ? [{ id: 'wrist', pose: wristPose }] : [],
+      modelPose ? [{ id: 'model', pose: { x: modelPose.x, y: modelPose.y, h: modelPose.z + space.floorY, yaw: modelPose.yaw, pitch: 0 } }] : []), ownInfo);
     const redraw = now - redrawAt > 100;
     if (redraw) redrawAt = now;
     for (const pn of list) {
