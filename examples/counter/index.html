@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MUMR counter</title>
+<style>
+  body { font: 16px/1.4 system-ui, sans-serif; margin: 24px; background: #111; color: #eee; }
+  button { font: inherit; padding: 8px 16px; margin: 4px; }
+  #players span { display: inline-block; margin-right: 12px; padding: 2px 8px; border-radius: 4px; }
+  pre { color: #9a9; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>MUMR counter</h1>
+<p>The smallest MUMR app: a shared counter (a game setting), each page's colour (a player setting), and a note that belongs to the
+page that wrote it (an owned thing). Open it in two tabs, or on two devices.</p>
+<p>Count: <b id="count">0</b> <button id="plus">+1</button> <button id="hue">My colour</button> <button id="note">Leave a note</button></p>
+<p id="players"></p>
+<p id="notes"></p>
+<pre id="status"></pre>
+<script src="/mumr/util.js"></script>
+<script src="/mumr/link.js"></script>
+<script src="/mumr/align.js"></script>
+<script src="/mumr/wire.js"></script>
+<script src="/mumr/session.js"></script>
+<script src="/mumr/life.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

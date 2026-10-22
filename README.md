@@ -1,0 +1,56 @@
+# MUMR: multi-user mixed reality
+
+An engine for shared mixed-reality worlds in the browser: two to four people in one room wear headsets (Quest 3, Quest Pro; a WebXR page,
+nothing installed), see the same virtual things in the same real places, and touch them with their hands. A PC on the same network serves
+the pages and keeps the shared state; PC pages can watch the whole world live.
+
+Extracted from **Nudgy** (KTE Project2, a toy loco tried out in mixed reality), where it ran on two headsets from 2026-10-13 to 2026-10-22.
+**Status 2026-10-22:** the core without THREE is extracted and tested (58 Node tests, 39 Python tests) and a counter example runs in two
+browser tabs. The XR parts (hands, line-up UI, anchors) and the first XR example are next; nothing of MUMR has run on a headset yet.
+See [docs/PLAN.md](docs/PLAN.md).
+
+## The idea
+
+| Kind | What | Example |
+|---|---|---|
+| **Document** | numbered JSON events; the server keeps the newest of each thing; a newcomer gets it all | settings, marks, the room, who is lined up |
+| **Body** | simulated on every page with everybody's hands; one page (the token holder) sends the state; a touch takes the token at once | a ball, a loco |
+| **Presence** | a stream only its owner writes | head and hands, where the menus float |
+
+One common floor frame from two touched floor spots; everything is sent in it. Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Try it
+
+```bash
+py -3 server/serve.py examples/counter 8766 --http --no-browser
+```
+
+Open `http://localhost:8766/` in two tabs. Press +1 in one and watch the other. For headsets, leave out `--http` and open the printed
+`https://` address on each (accept the certificate once).
+
+## Layout
+
+```
+server/    ws.py  hub.py  serverlog.py  serve.py        Python 3, standard library only
+client/    util link align wire session presence body worldfeed life (+ index.js for Node)   plain scripts, no build step
+test/      Node tests (hubfake.js: a pretend server for several pretend headsets in one process)
+server/tests/   Python tests
+examples/  counter (no XR)
+docs/      ARCHITECTURE.md  HOWTO-NEW-APP.md  PLAN.md  NOTES.md (what was learnt, and what was streamlined)
+```
+
+## Tests
+
+```bash
+node --test
+py -3 -m unittest discover -s server/tests -p "test_*.py"
+```
+
+`test/net.test.js` starts the real server on port 8798 (plain http, this PC only).
+
+## Rules for apps
+
+Everything in the world is shared (every player sees it and can touch it, every PC view shows it); send in the common frame through
+`align.Space`; interaction is physical (a touch is a touch); logging runs all the time. How to build one: [docs/HOWTO-NEW-APP.md](docs/HOWTO-NEW-APP.md).
+
+Line endings are LF (`.gitattributes`). There is no login on the server: anyone on the network can open the pages. No licence yet.

@@ -1,0 +1,111 @@
+# MUMR working notes
+
+A running log kept while extracting MUMR from Nudgy (`KTE/Project2`). Newest entries at the bottom of each section. Dates are absolute.
+These are notes, not the design: the design is in [ARCHITECTURE.md](ARCHITECTURE.md), the plan in [PLAN.md](PLAN.md).
+
+## 1. What the chats say (read 2026-10-22)
+
+The Nudgy MR work was spread over about fifteen Claude sessions, 2026-10-10 to 2026-10-22. What each one added to the engine's story, in order:
+
+| Date | Session (topic) | What it settled for the engine |
+|---|---|---|
+| 10-10 | First Quest Pro build | WebXR page, plain scripts that run in the browser and in Node, a local HTTPS server. **Interaction is literal and physical**: "only activate once the fingers are physically touching, don't try to be smart". |
+| 10-10/11 | Panels, hand mask, `changes.txt` lines | Panel follows "on a lead" (no rotation rule), a pinch handle, ghost fingertips. Exact hand outline via the XR hand mesh as a depth-only mask; long fingers needed `tipReach` 24 mm and `maskGrow` 3 mm. Pinch = select event OR tip joints < 22 mm (15 mm never fired). |
+| 10-11/12 | Rooms, palm platform, network hologram, ball | Doorways split rooms on the Quest 3. A loco can stand on a flat palm. Labels must not turn with the head, glow must not thicken lines. "The interaction between the loco and the ball needs to be always fully physically based." |
+| 10-12 | First two-player build | Jerky second headset, second player cannot touch things. Marek: "make one network per game ... make everything in the game (except menus) global". |
+| 10-13 | Two-player teardown and rebuild plan | "Its super janky, strip it completely." New rules: **everything shared, menus too; anyone may press any button on any menu; a menu acts for its owner**; line-up shows marks and allows fine adjustment. Decisions D1-D6 (authority follows touch, WebSocket via the PC, game vs player settings, printed sheets, room = first player's scan). |
+| 10-13 | M1 line-up run | A fingertip on the floor reads 60-70 mm high on the Quest 3, ~30 mm on the Quest Pro. Fine adjustment knobs (1/20 of the hand), 10 s averaged rest. "The lining up is now perfect." |
+| 10-14 | Tasks 8-11 (loco, room, menus, viewer) | Palm catch failed for the other player: their hands had no platform in our simulation (`withPlat`). The other player's menu must be drawn from **that player's** state and mode. Menus from behind: "just the menu background colour". Marked COMPLETE 10-15. |
+| 10-14 | "Is it portable?" | The idea of extracting a library; the dependency map and the first extraction plan. |
+| 10-14/15 | Lag, MMO question, UDP/WebRTC probe | Measured: ~130 kbit/s per headset; median round trip ~13 ms on every road; **TCP through the PC loses the tail** (31-37 % replaced, silences > 300 ms), a direct WebRTC channel does not. The Wi-Fi was the PC's own hotspot. Pages not in front get 1 Hz timers. Decision: direct lane not needed for now. |
+| 10-15 | PC world feed | Viewer role, compacted document on the hub, latest-packet cache, clock offsets, `WorldFeed`, `view.html`. Rule: **a shared thing the PC cannot see is not finished**. |
+| 10-15 | HoloLens / other headsets | Only `immersive-ar` + `local-floor` are required; HTC browsers lack `immersive-ar`. Meta's Shared Spaces sample (`shared` reference space) is the closest prior art. |
+| 10-14/15 | Webcam overlay, camera calibration | A real camera is a **shared world object owned by the page that made it** (`cam+`/`cam-`, gone with its connection, others may only *ask* it to move). "The camera's picture is never straightened; the overlay is bent to match it." |
+| 10-16 | Lumber Tycoon / feasibility | Touch authority alone is the wrong ownership model for a joystick game; needs **fixed-owner** and **host** policies, **per-object tokens**, an **entity-list packet**, and only awake objects should cost bandwidth. Hard problems named: ownership of piles (contact islands), "physical" is a spectrum, tracking drift. Proposed (not yet answered): three cheap experiments before investing (pile, drift, island). |
+| 10-16 | Check spot, camera pose | Spot 3 gets the same knobs/lock/autosave. Camera offset saved with its original pose. |
+| 10-16/20 | PC view textures, network on PC | The PC view drew things its own (wrong) way: **drawing code must be shared between headset and PC** (one module, tagged meshes). The PC copy of the simulation must follow the game's controller. |
+| 10-20/21 | Presentation | The live MUMR view embedded in a slide (iframe of `view.html`). |
+| 10-21 | Room supplier | The room came from the lowest slot and flipped when the supplier took its headset off. Now: **the first headset in supplies it, it changes hands only by a button, the server keeps the last room when the supplier leaves.** |
+| 10-21/22 | Put-on drift | Taking the headset off fires 2-4 `reset` events whose transforms are **wrong** (2-12 m claimed; the room moved < 4 m with turns up to 141°); the anchor object the page holds does **not** update. What works: wait until tracking settles (2 s no reset, visible, pose stable 0.7 s), **ask for the persistent anchor again**, put the saved line-up back from it. 3 passes: within 3 cm. |
+| 10-22 | Logging | Marek, angry: logging must run **all the time** while debugging and be verified before he puts the headset on. A recorder that reads the page's frame loop goes blind when the app is hidden. Now: an always-on server log, and the page posts its life lines to the server the moment they happen (`keepalive`). |
+
+Marek's working preferences that matter for the engine's tooling: he tests on two headsets (Quest 3, Quest Pro); he cannot describe what he sees precisely, so **the data must say it** (debug snapshots, server log); he types, he does not talk back while in VR; the `live-debug` skill reads cues aloud but he finds it chatty.
+
+## 2. Patterns that can be streamlined (found while reading the code, 2026-10-22)
+
+Each item: what is there now in Nudgy, why it costs, what MUMR does instead. **Done** = built that way in MUMR already.
+
+1. **The hub knows the game.** `hub.py` `_keep` lists Nudgy's event kinds (`game`, `player`, `mark+`, `mark~`, `room`, `frame`, `check`, `net`) and `_forget` knows that a room keeps its data but loses its slot, and that `game:roomFrom` is cleared. Every new shared thing meant a Python change and a "keep the two in step" comment.
+   **MUMR:** events describe their own keeping: `{k, key, drop, scope, clear}`. The hub keeps the newest event per `key`, removes it on `drop`, removes all keys with a prefix on `clear`, and on a player's leave removes what that player said with `scope: 'slot'`. The hub has no list of kinds. **Done.**
+2. **Cameras are a special subsystem** (180 lines across `hub.py`, `cams.js`, `session.js`, `worldfeed.js`) with its own validation twice (Python `cam_ok`, JS `clean`, "keep the two in step"), its own ownership, rate limit, cap and request message (`cam>`).
+   It is really a general pattern: an **owned object** — something in the document that belongs to the connection that made it, that only it may change, that goes when it goes, and that others may only *ask* to change.
+   **MUMR:** `own: true` on an event makes the key owned by the sender's connection; `{t:'ask', key, m}` is passed to the owner only. Rate limit and per-connection cap are generic. Validation of content is the app's, on the client, in one language (the hub only checks size and shape). **Done.**
+3. **Two tokens with fixed names** (`BODIES = ("sim", "holo")`, `OWNED = {1: "sim", 3: "holo"}`), and session.js writes `{ sim: null, holo: null }` in four places. A game with 40 logs needs 40 tokens.
+   **MUMR:** tokens are named by the app (any short string); the server is told which packet types belong to which token at start (`Hub(owned={type: token})`), and a packet for an entity list can name its token per packet (`token` field in the header, see 4). **Done** for named tokens; per-entry checks are later (PLAN phase 5).
+4. **Three packet layouts have a sender clock, two do not** (`H`, `M` were timed by arrival on the PC). And each receiver had its own "drop an older packet" check (only `S` had one).
+   **MUMR:** one header for every packet: `u8 type, u8 slot (server-written), u32 sender clock (ms)`; the ordering guard is in one place (`wire.Guard`). **Done.**
+5. **The XR-space / common-frame conversion is written four times** with small differences: `holoshare.js` (`toCommon(f, fy, p)`, XR point with y up and z towards you), `menus.js` (`panelOut`/`wristOut` with `floorY` and `fz`), `cams.js` `toOwn`, `capture.js` `sourcesToCommon`. The rule (`x = X, y = -Z`, height above the *common* floor = `Y - floorY - frame.z`, a yaw about the vertical is the same turn in both) is easy to get wrong.
+   **MUMR:** one `align.Space` object per headset (`frame`, `floorY`) with `xrToCommon`, `commonToXr`, `yawToCommon`, `quatToCommon` and their inverses. **Done.**
+6. **"Are we sharing?" is decided twice, differently.** `share.js`: connected, lined up, and some other player lined up and heard from lately; `holoshare.js`: connected, lined up, and some *peer* in `doc.lined`. Both then add "or a viewer is watching" by hand.
+   **MUMR:** `session.sharing()` and `session.sending()` (sharing, or watched while lined up), used by every Body. **Done.**
+7. **`Share` and `HoloShare` are one pattern written twice** (claim on reach, busy while touched, send at a rate, receive only from the holder, handover counts, status). Known from the first plan.
+   **MUMR:** `Body` with an adapter (`reach`, `touching`, `pack`, `apply`, `settle`) and a policy (`touch`, `owner`, `host`). **Done** (touch and owner; host needs a host client, PLAN phase 6).
+8. **Validation of numbers is repeated everywhere** (`Number.isFinite` chains, `_num`, `_cnum`). Small, but a helper (`num(v, lo, hi)`) used throughout keeps checks readable. **Done** in MUMR's `util.js`.
+9. **Every packet type had to be added in four places** to reach the PC: `wire.js`, `hub.py` (`OWNED`), `worldfeed.js` (`STREAM`, `MAKE`, `BLEND`, `_bin`), `view.js`.
+   **MUMR:** `wire.register({type, name, pack, unpack, blend, token})`; `WorldFeed` buffers every registered stream and blends with the stream's own `blend`. A new packet reaches the PC with no change to the feed. **Done.**
+10. **Debug output depends on the frame loop.** Nudgy's `events.py`/`observe.py` read snapshots that the page posts from its frame loop; they go blind when the app is hidden, which is exactly when the interesting things happen (put-on, idle drop-out). The 10-22 fix added a server log and posts life lines with `keepalive`.
+    **MUMR:** the server log is part of the server (`serverlog.py`, always on), and the client has `life.js` (numbered lines, `sendBeacon`/`fetch keepalive`, a `sessionStorage` copy that survives a reload, resent if a post failed). **Done.**
+11. **CRLF.** Nudgy's files are CRLF; the Edit tool writes LF and Git Bash `sed -i`/`cat >>` mix them, which cost a fix commit more than once.
+    **MUMR:** LF everywhere, enforced by `.gitattributes` (`* text=auto eol=lf`). **Done.**
+12. **Two servers in one.** `serve_https.py` is the static server, the TLS setup, the WebSocket, and Nudgy's PC remote relay (`/relay/state|cmd|fast`, SSE) and `/networks.json` and `/probe/log`.
+    **MUMR:** `serve.py` is static + TLS + `/ws` + `/log` + build stamp, with `routes` for the app's own paths; the relay stays Nudgy's (the viewer role replaces it in new apps). **Done.**
+13. **Drawing code drifted between the headset and the PC** (boxes, rugs and balls had no textures on the PC; the PC network had no wires). Not an engine module yet (it needs THREE).
+    **MUMR, later:** the app's drawing of shared things lives in one module that both pages import; the engine only asks for it (HOWTO says so).
+14. **The anchor dance is page code** (~150 lines in `app.js`: persistent anchor, `reset` events, settle, re-find, save/load the line-up). Every MR app needs it.
+    **MUMR, later:** `anchor.js` (logic: `Resets` + a re-find state machine with injected `restore()`/`getPose()`), with the page only wiring XR calls. `align.js` already carries `Resets` and `Aligner.save/load/rebase`. PLAN phase 3.
+15. **`Session._hello` asks the `sim` holder for the document.** Now that the hub keeps a compacted document (for viewers), players could take it from the hub too: one source of truth, no "who do I ask", and the document survives everyone leaving.
+    **MUMR:** players get `doc` in their hello like viewers; `sync` from a peer is gone. The app's *keyframe* (a Body's full state, e.g. the network's hidden state) still comes from the holder via `syncFrom` on first join. **Done.**
+16. **Silent-holder timeout = throttled-page interval.** The hub takes tokens from a holder silent for 1.0 s; a page not in front ticks at 1 Hz. That sits exactly on the line (a lead on the idle drop-out, never proven).
+    **MUMR:** `SILENT` is 2.5 s by default and a parameter. Noted as a thing to measure.
+17. **A quick second press was lost** (found 2026-10-22 with the counter example in two tabs: three quick `+1` counted once). A setting
+    changed only when the server's echo came back, so the second press computed from the old value. Nudgy's session has the same
+    behaviour (harmless there: a toggle pressed twice within ~13 ms does not happen by hand), but a game with counters or steps would lose
+    presses. **MUMR:** the page's own changes are kept as *pending* until their echo comes back: shown at once, and the next press starts
+    from them; the server's order still decides. **Done**, with a test.
+18. **The hub's hello to a player now carries the document and the newest packets** (as a viewer's did). A joiner sees the world at once
+    without asking anyone, and bodies at rest need not keep sending for a newcomer to see them. **Done.**
+
+## 3. Things that must not be lost (from the Nudgy build)
+
+Kept from the first plan's section 6, plus what came after it:
+
+- Common frame: x, y on the floor; heights above the **common** floor (each headset's floor differs by centimetres); a yaw about the vertical is the same turn in sim coordinates and in THREE's Y axis.
+- Never send a headset's own coordinates; never trust the sender's slot byte (the server writes it).
+- Build stamp: a page of another build is refused at join ("reload"). Without it a headset runs an old page and everything looks half-broken. When Marek reports a two-headset fault, first check that **both** headset addresses fetched the page after the last change.
+- Decide the page's role before the session starts; never change it from a frame loop.
+- Server hardening: a send queue per player (messages first, newest motion per kind and sender), a silent holder loses its token, TCP keepalive and no Nagle, a watchdog that ignores a paused page, timestamped leave reasons.
+- Alone, the same code path: `emit` applies at once.
+- Authority follows touch needs everybody's hands in every simulation (and their derived parts: the palm platform), so a push is applied in the frame it happens; a handover must not snap (`markInStep`).
+- The room: first headset in supplies it, changes hands only by a button, stays when the supplier leaves.
+- Tracking resets: don't trust the `reset` transform alone; re-find the persistent anchor after the tracking settles.
+- Test order: Node with two pretend headsets (a fake hub), then two browser tabs, then two headsets **with the server log running first**.
+
+## 4. Open questions for Marek
+
+1. Repo is private (`machmar/mumr`). Public later?
+2. The three experiments from 10-16 (pile of 20-30 cubes, 10-minute drift, island push) were proposed but never answered. They decide how far "everything is physical" can go. Run them on the example app?
+3. Should Nudgy move onto MUMR (replace its own copies), or stay as it is and MUMR only serve new projects? The plan assumes it moves, after one headset session.
+4. More than two players: the wire allows four slots; nothing above two has run.
+5. `dbg.mp.sharedSpace` (does the Quest Browser offer a `shared` reference space?) was recorded in every run and never read. If yes, line-up could be automatic.
+
+## 5. Log
+
+- **2026-10-22** Read the MR chats (17 transcripts in the Project2 folder, user messages in full, Claude's replies cut to 500 characters;
+  the Lumber Tycoon / feasibility chat in full). Refreshed the plan (PLAN.md). Created `machmar/mumr` (private, LF, no licence yet: ask).
+- **2026-10-22** Extracted the core without THREE, written fresh from Nudgy's files with the streamlining above: `server/` (ws copied,
+  hub/serve/serverlog generic), `client/` (link and align ported with their tests unchanged apart from the namespace; wire, session,
+  presence, body, worldfeed, life new). 58 Node tests (net.test.js against the real server), 39 Python tests. The presence packet is
+  byte for byte Nudgy's (checked against a packet made by Nudgy's own wire.js). `examples/counter` checked in two tabs in the browser
+  pane: the second tab took the world from the server, settings and an owned note crossed, the note went with its tab; it found item 17.
+- Not done: anything with THREE or WebXR; nothing has run on a headset; Nudgy is untouched (except a pointer at the top of its old
+  extraction plan).
