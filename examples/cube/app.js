@@ -57,6 +57,7 @@ const sys = new SysMenu(S, lineup, {
   exit: () => { if (xr) xr.session.end(); else say('Not in mixed reality'); },
   roomSetup: () => { const r = xr ? xr.roomSetup() : 'none'; say(r === 'started' ? 'Room setup: the headset takes over' : r === 'used' ? 'Room setup was used once: leave mixed reality and come back for it again' : 'No room setup here'); },
   roomUsed: () => !!(xr && xr.roomUsed),
+  life,
 });
 const cube = new C.Cube();
 const body = new M.body.Body(S, { token: 'cube', type: 'cube', adapter: C.adapter(cube, space) });
@@ -185,7 +186,6 @@ function onFrame(time, frame) {
   body.send(now);
   // the menus: ours follows us in mixed reality and stands still on the desktop; everybody's can be pressed
   if (!follower.pose) { if (xr) follower.snap({ x: head[0], y: head[1], th: head[2], py: head[3] + space.floorY }); else follower.set({ x: 0.9, y: 0.55, h: 0.95, yaw: -2.4, pitch: 0.15 }); }
-  sys.tick();
   const st = S.stateOf(null), sysInfo = sys.info(), ownInfo = { players: S.others + 1, sys: sysInfo };
   const lay = C.menu(st, ownInfo), want = new Set(['own:main']);
   const busyKeys = new Set();
@@ -210,7 +210,6 @@ function onFrame(time, frame) {
     hover = r.hover;
     for (const k of r.busy) busyKeys.add(k);
     for (const pr of r.presses) pressed(pr.owner, pr.button, pr.key);
-    if (r.at.has('own:wrist')) sys.use();      // (a fingertip at the wrist card itself: it is in use; a hand merely near it is not)
   }
   // the handle under our menu: a pinch that starts at it carries the menu; where it is let go is where it stays (and how far and how high
   // it keeps to us from then on: follow.js place)

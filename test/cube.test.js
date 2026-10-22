@@ -110,15 +110,25 @@ test('the wrist menu: its buttons act at its owner, Line up opens it, and it sho
   pose = pose || sys.place(head, jp, 0) || sys.place(head, flipped, 0);
   assert.ok(pose && Number.isFinite(pose.yaw) && pose.h > 1, JSON.stringify(pose));
   assert.strictEqual(sys.place(head, null, 0), null, 'no hand: no menu');
-  // open and unused for a minute: it folds by itself (not while lining up)
+  // the open home menu folds when you look away from it (half a second), and when the wrist turns away; lining up, it never folds by itself
   let t = 0;
-  const S2 = new M.session.Session(null, {}), L2 = new M.lineup.LineUp(S2, new M.align.Space(null, 0)), said = [];
-  const s2 = new M.sysmenu.SysMenu(S2, L2, { now: () => t, say: (x) => said.push(x) });
-  s2.press('sysOpen'); t = 59000; s2.tick();
-  assert.strictEqual(s2.open, true);
-  s2.use(); t = 118000; assert.strictEqual(s2.tick(), false, 'a fingertip at it a minute ago');
-  t = 120500; assert.strictEqual(s2.tick(), true); assert.strictEqual(s2.open, false);
-  s2.press('lineUp'); t = 400000; s2.tick();
-  assert.strictEqual(s2.open, true, 'not while lining up');
-  assert.strictEqual(said.length, 1);
+  const S2 = new M.session.Session(null, {}), L2 = new M.lineup.LineUp(S2, new M.align.Space(null, 0)), folds = [];
+  const s2 = new M.sysmenu.SysMenu(S2, L2, { now: () => t, life: (x) => folds.push(x) });
+  const card = (h) => s2.place(h, jp, 0) || s2.place(h, flipped, 0);
+  const look = [0, 0, Math.PI / 2, 1.6, -0.5], away = [0, 0, 0, 1.6, -0.5];
+  const shown = s2.place(look, jp, 0) ? jp : flipped;
+  s2.press('sysOpen');
+  t = 0; s2.place(look, shown, 0); t = 2000; s2.place(look, shown, 0);
+  assert.strictEqual(s2.open, true, 'looked at: it stays open');
+  t = 2100; s2.place(away, shown, 0); t = 2400; s2.place(away, shown, 0);
+  assert.strictEqual(s2.open, true, 'a glance aside does not fold it');
+  t = 2700; s2.place(away, shown, 0);
+  assert.strictEqual(s2.open, false, 'looked away for half a second: folded');
+  s2.press('sysOpen'); s2.place(look, shown, 0);
+  s2.place(look, shown === jp ? flipped : jp, 0);
+  assert.strictEqual(s2.open, false, 'the wrist turned away: folded');
+  s2.press('lineUp'); t = 3000; s2.place(away, shown, 0); t = 9000; s2.place(away, shown, 0); s2.place(look, shown === jp ? flipped : jp, 0);
+  assert.strictEqual(s2.open, true, 'lining up: it never folds by itself');
+  assert.strictEqual(folds.length, 2, folds.join(' | '));
+  void card;
 });
