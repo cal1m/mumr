@@ -3,7 +3,8 @@
 // (depthTest off), so a fingertip is visible in front of a menu too. From Nudgy (app.js GhostHand), made a factory: makeGhost(THREE).
 const FINGERS = [[2, 3, 4], [7, 8, 9], [12, 13, 14], [17, 18, 19], [22, 23, 24]];
 const RINGS = [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.0, 1.0], SCALE = [1, 1, 1, 1, 1, 1, 0.82, 0.4], OUT = [0, 0, 0, 0, 0, 0, 0.55, 0.92], SEG = 8;
-export const GHOST_COLOURS = { idle: 0x0b0d12, touch: 0x2f6fc8, hold: 0x2e8b57, point: 0xf2c14e };
+// (idle is the engine's default for every hand; an app may colour them: createApp's ghostColour, 'grips' for pinch and fist)
+export const GHOST_COLOURS = { idle: 0x0b0d12, touch: 0x2f6fc8, hold: 0x2e8b57, point: 0xf2c14e, pinch: 0x2e8b57, fist: 0xd9822b };
 
 export function makeGhost(THREE) {
   const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), c = new THREE.Vector3(), t = new THREE.Vector3(), n = new THREE.Vector3(), b = new THREE.Vector3(), up = new THREE.Vector3();

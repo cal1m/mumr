@@ -64,7 +64,8 @@ NOTES 1, 2026-10-22).
 | `client/menus.js` | menu layouts (`grid`), the hit test, panel axes, `Poke` (a fingertip through a button from the front), `Menus` (everyone's panel poses and info through `M`) | session, wire, align |
 | `client/anchor.js` | `Keeper`: the persistent anchor, reset events, settle, found again by its handle (the 10-22 fix) | util, align |
 | `client/lineup.js` | `LineUp`: Aligner + keeper + session + saving, its buttons (`lineUp`, `p1create` ...), rows and info for the menu, marks to draw | align, session, anchor |
-| `client/room.js` | the room: a headset's planes on its floor plan, the server's room in the common frame (uploaded once by the first headset when the server has none, or by the Upload button), `support` and `pushOut` for an app's physics | session, align |
+| `client/room.js` | the room: a headset's planes on its floor plan, the server's room in the common frame (uploaded once by the first headset when the server has none, or by the Upload button); `kind` (table, solid, wall ...), `support`, `ceiling` and `pushOut` for an app's physics | session, align |
+| `client/grab.js` | the two grips a hand has, for any app: a pinch (thumb and index touching) and a fist (the four fingers curled to the palm), from anybody's hand sources | hands |
 | `client/sysmenu.js` | the engine's own menu on the inside of the left wrist (folded: a wrist button; open: Line up with its spot rows, Room setup, Exit), shared like every menu (panel `wrist`, state in the menus' info.sys) | lineup, menus, follow |
 | `client/host.js` | the host process (Node): the app's own simulation on the PC, holding what nobody touches | everything plain |
 | `client/all.js` | the browser's one-tag loader for all of the above | - |

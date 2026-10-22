@@ -112,6 +112,15 @@ Each item: what is there now in Nudgy, why it costs, what MUMR does instead. **D
     connects with a scan uploads its own, once) or when a player presses Upload in the line-up menu's Room row (that headset's scan,
     once). No supplier, no updates by themselves, nothing happens when a headset leaves. This also removed the per-player "who
     supplies" thing from the document: `room` is one kept event `{ data, by, at }`. `client/room.js`; tests in `test/room.test.js`.
+30. **First room run** (Marek, 2026-10-22, one headset). Faults: a held cube pushed into a wall snapped through it and stayed on the
+    other side; it seemed to fall through gaps narrower than itself; it got behind a bed and slid under it; a pinch had to be made at
+    its edge because the closing fingers pushed it away; the room preview did not tell tables from objects. **Done:** the hold is a
+    spring (it follows the hand at most 5 m/s, stops at whatever is in the way, lets go when the hand is 30 cm off); every move goes in
+    1 cm steps and a wall keeps a thing on the side it came from, so nothing passes anything; support is the highest point under nine
+    points of the footprint (a narrower gap carries it; hanging over an edge it slides off); room.js kind(): tables have space under
+    them (a 4 cm slab), every other raised level surface (bed, couch, storage, other) is a block down to the floor; a hand that is
+    closing on the cube, or touches it on two sides, does not push it. The engine has grips now (`client/grab.js`: pinch and fist,
+    for every app); the ghost fingers keep one colour unless the app asks (`ghostColour: 'grips'`, which the cube does).
 
 ## 3. Things that must not be lost (from the Nudgy build)
 

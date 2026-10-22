@@ -56,6 +56,10 @@ ball.frame(now, ownHands); simulate(hands); ball.send(now); presence.send(now, h
 link.onBin = (b) => { const p = MUMR.wire.decode(b); if (p.name === 'presence') presence.receive(p, now); else ball.receive(p, now); };
 ```
 
+- Grabbing: `const grips = new MUMR.grab.Grips(); grips.update(hands)` gives every hand's grip (`pinch` or `fist`, `start`, `end`,
+  `at`) from everybody's sources; the app decides what a grip that starts near a thing takes. The room: `app.room.local()`, and
+  `MUMR.room.support / ceiling / pushOut` for physics (move in steps shorter than the thing's radius and pass `from`: nothing goes
+  through a wall). `examples/cube/cube.js` uses all of it.
 - Every page simulates every body with **everybody's** hands, including what is derived from them (Nudgy's palm platform: the other
   player's hand had none, so a loco dropped on it fell through).
 - Requests from a page that does not hold the body: `ball.ask('place', { x, y })` in the common frame.

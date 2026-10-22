@@ -13,10 +13,11 @@
 //     step(dt, t, hands, own),                           the app's simulation, every frame (hands: everybody's; own: this page's)
 //     draw(app, now),                                    the app's drawing, every frame (app.world is the floor: THREE (x, z, -y))
 //     onAction(id, from),                                the app's own action buttons (an action happens at the menu's owner)
-//     ghostColour(id, own) -> colour,                    (optional) this page's ghost fingers' colour for hand `id`
+//     ghostColour(id, own, grip) -> colour | 'grips',    (optional) this page's ghost fingers' colour for hand `id` (grip: its grab.js
+//                                                        state); 'grips' colours a pinch and a fist (GHOST_COLOURS); default: never changes
 //     status() -> text,                                  (optional) the app's part of the status line
 //     anchorKey, name })                                 (optional) where the anchor is kept; who this page is in the log
-//   app: { THREE, scene, world, camera, S, space, presence, menus, lineup, sys, room, life, say, head(), xr(), bodies, ownerText(slot) }
+//   app: { THREE, scene, world, camera, S, space, presence, menus, lineup, sys, room, grips, life, say, head(), xr(), bodies, ownerText(slot) }
 //   (app.room.local(): the room in this page's floor plan, for the app's physics: room.js support / pushOut)
 // The page needs the elements #view (canvas), #enter, #xrNote, #say, #status.
 import { enterXR } from './session.js';
@@ -79,7 +80,7 @@ export async function createApp(o) {
     room, life,
   });
   const bodies = (typeof o.bodies === 'function' ? o.bodies({ S, space, say, life }) : o.bodies || []).map((b) => new M.body.Body(S, b));
-  const pinch = new M.hands.Pinch(), poke = new M.menus.Poke(), follower = new M.follow.Follower();
+  const pinch = new M.hands.Pinch(), poke = new M.menus.Poke(), follower = new M.follow.Follower(), grips = new M.grab.Grips();
   const isHost = (slot) => { const p = S.peers.get(slot); return slot === HOST || !!(p && p.host); };
   const ownerText = (slot) => (slot === null || slot === undefined ? 'nobody' : isHost(slot) ? 'host' : slot === S.me ? 'you' : `player ${slot + 1}`);
   link.onBin = (b) => {
@@ -112,10 +113,11 @@ export async function createApp(o) {
     lineup.given({ x: x || 0, y: y || 0, yaw: ((deg || 0) * Math.PI) / 180 });
     life(`pretend line-up ${QS.get('frame')}`);
   }
-  // a pretend room scan for the desktop rehearsal: a floor, a table and two walls in this tab's floor plan
+  // a pretend room scan for the desktop rehearsal: a floor, a table, a bed and two walls in this tab's floor plan
   if (QS.get('room') === 'demo') room.setScan({ planes: [
     { l: 'floor', v: false, p: [[-1, -1.5, 0], [3, -1.5, 0], [3, 1.6, 0], [-1, 1.6, 0]] },
     { l: 'table', v: false, p: [[0.9, 0.0, 0.72], [1.7, 0.0, 0.72], [1.7, 0.6, 0.72], [0.9, 0.6, 0.72]] },
+    { l: 'bed', v: false, p: [[-0.9, -1.4, 0.5], [0.1, -1.4, 0.5], [0.1, -0.5, 0.5], [-0.9, -0.5, 0.5]] },
     { l: 'wall', v: true, p: [[-1, 1.6, 0], [3, 1.6, 0], [3, 1.6, 2.4], [-1, 1.6, 2.4]] },
     { l: 'wall', v: true, p: [[3, -1.5, 0], [3, 1.6, 0], [3, 1.6, 2.4], [3, -1.5, 2.4]] },
   ] });
@@ -174,7 +176,7 @@ export async function createApp(o) {
     camera.getWorldDirection(v3);
     return [camera.position.x, -camera.position.z, Math.atan2(-v3.z, v3.x), camera.position.y, Math.asin(v3.y)];
   }
-  const app = { THREE, scene, world, camera, renderer, S, space, presence, menus, lineup, sys, room, life, say, bodies, ownerText, head: () => head, xr: () => xr };
+  const app = { THREE, scene, world, camera, renderer, S, space, presence, menus, lineup, sys, room, grips, life, say, bodies, ownerText, head: () => head, xr: () => xr };
   function onFrame(time, frame) {
     const now = performance.now(), dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
     if (xr) xr.frame = frame || null;
@@ -189,10 +191,12 @@ export async function createApp(o) {
       const scan = readPlanes(xr, frame, space, planeState);
       if (scan !== undefined) room.setScan(scan);
       const ghost = S.stateOf(null).ghost !== false;
+      grips.update(own);
       for (const id of ['left', 'right']) {
         const h = r.hands.find((q) => q.id === id && q.jp), g = ghosts[id];
         if (!h || !ghost) { g.mesh.visible = false; continue; }
-        g.update(h.jp, h.jr, o.ghostColour ? o.ghostColour(id, own) : GHOST_COLOURS.idle);
+        const gr = grips.of(id);
+        g.update(h.jp, h.jr, o.ghostColour === 'grips' ? GHOST_COLOURS[gr.kind] || GHOST_COLOURS.idle : typeof o.ghostColour === 'function' ? o.ghostColour(id, own, gr) : GHOST_COLOURS.idle);
       }
     } else if (mouse) {
       own = [{ id: 'mouse', pinch: !!mouse.pinch, points: [{ name: 'index', x: mouse.x, y: mouse.y, z: 0.05 }, { name: 'thumb', x: mouse.x, y: mouse.y, z: 0.05 }] }];

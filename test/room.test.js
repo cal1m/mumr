@@ -100,17 +100,86 @@ test('alone, or not lined up, a page uses its own scan; the wrist menu shows the
   assert.ok(lay.buttons.some((q) => /own scan 4 planes/.test(q.value || '')), 'how many planes');
 });
 
-test('the cube rests on a table, falls off its edge and stops at a wall', () => {
+test('the cube rests on a table, tips off its edge and stops at a wall', () => {
   const cube = new C.Cube();
   cube.room = scan();
   cube.place(1.5, 0.5); cube.z = 1.0;                           // dropped over the table
   for (let i = 0; i < 100; i++) cube.step(0.01, i * 0.01, []);
   near(cube.z, 0.7 + C.HALF, 1e-6, 'on the table');
   assert.strictEqual(cube.moving(), false);
-  cube.vx = -1.5;                                               // pushed off the table's edge (x = 1)
-  for (let i = 0; i < 200; i++) cube.step(0.01, i * 0.01, []);
+  cube.vx = -1.5;                                               // pushed towards the table's edge (x = 1)
+  for (let i = 0; i < 400; i++) cube.step(0.01, i * 0.01, []);
   near(cube.z, C.HALF, 1e-6, 'on the floor again'); assert.ok(cube.x < 1);
-  cube.place(1, 1.7); cube.vy = 2;                              // slid at the wall (y = 2)
+  cube.place(1, 1.7); cube.vy = 6;                              // thrown hard at the wall (y = 2)
+  for (let i = 0; i < 100; i++) { cube.step(0.01, i * 0.01, []); assert.ok(cube.y <= 2 - C.R + 1e-9, `never past the wall: ${cube.y}`); }
+});
+
+// a hand that pinches at the point `at` (thumb and index together)
+const pinching = (id, at, on = true) => ({ id, pinch: on, points: [{ name: 'thumb', x: at[0] - 0.004, y: at[1], z: at[2] }, { name: 'index', x: at[0] + 0.004, y: at[1], z: at[2] }] });
+
+test('held, the cube is on a spring: a hand pulled through a wall cannot take it through; pulled far away, it lets go', () => {
+  const cube = new C.Cube(), wallY = 2;
+  cube.room = scan(); cube.place(0.5, 1.6);
+  let t = 0;
+  const at = [0.5, 1.6 - C.HALF - 0.01, C.HALF];
+  cube.step(0.016, t += 0.016, [pinching('h', at, false)]);
+  cube.step(0.016, t += 0.016, [pinching('h', at)]);
+  assert.strictEqual(cube.held.kind, 'pinch');
+  for (let k = 1; k <= 30; k++) {                               // the hand goes 1 cm a frame through the wall
+    cube.step(0.016, t += 0.016, [pinching('h', [at[0], at[1] + k * 0.01, at[2]])]);
+    assert.ok(cube.y <= wallY - C.R + 1e-9, `the cube stays on its side: ${cube.y} at step ${k}`);
+  }
+  assert.ok(cube.held, 'still held 30 cm in');
+  for (let k = 31; k <= 90; k++) cube.step(0.016, t += 0.016, [pinching('h', [at[0], at[1] + k * 0.01, at[2]])]);
+  assert.strictEqual(cube.held, null, 'too far: let go'); assert.ok(cube.y < wallY);
+});
+
+test('a bed is solid to the floor: the cube rests on it, does not slide under it, and does not fall into a gap narrower than itself', () => {
+  const room = { planes: [
+    { l: 'bed', v: false, p: [[0, 0, 0.5], [2, 0, 0.5], [2, 1, 0.5], [0, 1, 0.5]] },
+    { l: 'storage', v: false, p: [[0, 1.08, 0.5], [2, 1.08, 0.5], [2, 2, 0.5], [0, 2, 0.5]] },     // 8 cm from the bed: narrower than the cube
+    { l: 'table', v: false, p: [[3, 0, 0.7], [4, 0, 0.7], [4, 1, 0.7], [3, 1, 0.7]] },
+  ] };
+  const cube = new C.Cube();
+  cube.room = room;
+  cube.place(-0.5, 0.5); cube.vx = 3;                           // slid at the bed's side on the floor
+  for (let i = 0; i < 200; i++) { cube.step(0.01, i * 0.01, []); assert.ok(cube.x <= -C.R + 1e-9, `not under the bed: ${cube.x}`); }
+  cube.place(1, 1.04); cube.z = 1;                              // dropped onto the gap between the bed and the storage
+  for (let i = 0; i < 200; i++) cube.step(0.01, i * 0.01, []);
+  near(cube.z, 0.5 + C.HALF, 1e-6, 'it rests across the gap');
+  cube.place(2.5, 0.5); cube.vx = 2;                            // slid under the table: there is space under it
   for (let i = 0; i < 100; i++) cube.step(0.01, i * 0.01, []);
-  assert.ok(cube.y <= 2 - C.HALF * 1.2 + 1e-9, `stopped at the wall: ${cube.y}`);
+  assert.ok(cube.x > 3.1, `under the table: ${cube.x}`); near(cube.z, C.HALF, 1e-6);
+  // and lifted into it from below, it stops at the underside
+  let t = 0;
+  const at = [cube.x + C.HALF + 0.01, cube.y, cube.z];
+  cube.step(0.016, t += 0.016, [pinching('h', at, false)]); cube.step(0.016, t += 0.016, [pinching('h', at)]);
+  for (let k = 1; k <= 30; k++) cube.step(0.016, t += 0.016, [pinching('h', [at[0], at[1], at[2] + k * 0.02])]);
+  near(cube.z + C.HALF, 0.7 - M.room.TABLE_T, 1e-6, 'held against the underside');
+});
+
+test('the grips: a fist holds the cube as well as a pinch; a hand closing on it does not push it away', () => {
+  // a hand: palm at `p`; the four fingertips `d` from the palm (curled: small d), thumb tip beside the index
+  const hand = (id, p, d) => {
+    const pts = [['palm', 0, 0], ['index', d, 0.02], ['middle', d, 0.005], ['ring', d, -0.01], ['pinky', d, -0.025], ['thumb', d * 0.5, 0.05]]
+      .map(([name, dx, dy]) => ({ name, x: p[0] + dx, y: p[1] + dy, z: p[2] }));
+    return { id, pinch: false, points: pts };
+  };
+  const cube = new C.Cube();
+  cube.place(0, 0);
+  let t = 0;
+  const palm = [C.HALF + 0.05, 0, C.HALF];
+  cube.step(0.016, t += 0.016, [hand('r', palm, 0.09)]);
+  cube.step(0.016, t += 0.016, [hand('r', palm, 0.03)]);
+  assert.strictEqual(cube.held && cube.held.kind, 'fist', 'a fist closed at it');
+  for (let k = 1; k <= 40; k++) cube.step(0.016, t += 0.016, [hand('r', [palm[0] + k * 0.005, 0, C.HALF + k * 0.005], 0.03)]);
+  for (let k = 0; k < 20; k++) cube.step(0.016, t += 0.016, [hand('r', [palm[0] + 0.2, 0, C.HALF + 0.2], 0.03)]);
+  near(cube.x, 0.2, 0.01, 'carried'); near(cube.z, C.HALF + 0.2, 0.01);
+  cube.step(0.016, t += 0.016, [hand('r', [palm[0] + 0.2, 0, C.HALF + 0.2], 0.09)]);
+  assert.strictEqual(cube.held, null, 'opened: let go');
+  // the thumb and index coming together right at its face (2 cm apart, inside its skin) do not push it away
+  cube.place(0, 0); for (let i = 0; i < 5; i++) cube.step(0.016, t += 0.016, []);
+  const x = C.HALF - 0.005;
+  cube.step(0.016, t += 0.016, [{ id: 'l', pinch: false, points: [{ name: 'thumb', x, y: -0.01, z: C.HALF }, { name: 'index', x, y: 0.01, z: C.HALF }] }]);
+  near(cube.x, 0, 1e-9, 'not pushed while closing');
 });

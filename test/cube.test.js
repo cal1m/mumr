@@ -29,6 +29,7 @@ test('only a pinch that starts at the cube holds it; it goes up with the hand an
   c.step(0.016, t += 0.016, [hand(C.HALF + 0.01, C.HALF, true)]);
   assert.ok(c.held && c.held.by === 'left', 'pinched at its side');
   for (let k = 1; k <= 20; k++) c.step(0.016, t += 0.016, [hand(C.HALF + 0.01, C.HALF + k * 0.01, true)]);
+  for (let k = 0; k < 30; k++) c.step(0.016, t += 0.016, [hand(C.HALF + 0.01, C.HALF + 0.2, true)]);      // (the hold is a spring: it catches up)
   assert.ok(Math.abs(c.z - (C.HALF + 0.2)) < 1e-6, `lifted 20 cm: ${c.z}`);
   c.step(0.016, t += 0.016, [hand(C.HALF + 0.01, C.HALF + 0.2, false)]);
   assert.strictEqual(c.held, null, 'the fingers parted');

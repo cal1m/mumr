@@ -6,7 +6,7 @@
 // Everything that is not the cube (the scene, the menus, the wrist menu, lining up, the desktop rehearsal) is /mumr/xr/app.js.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { createApp, GHOST_COLOURS, PLAYER_COLOURS } from '/mumr/xr/app.js';
+import { createApp, PLAYER_COLOURS } from '/mumr/xr/app.js';
 import { makeCube, setCube, ownerOf } from './draw.js';
 
 const C = window.CUBE, cube = new C.Cube(), cubeMesh = makeCube(THREE, C.SIZE);
@@ -19,8 +19,8 @@ const app = await createApp({
   bodies: ({ space }) => [{ token: 'cube', type: 'cube', adapter: C.adapter(cube, space) }],
   setup: ({ world }) => world.add(cubeMesh, cubeMesh.userData.holder),
   step: (dt, t, hands) => { cube.room = app.room.local(); cube.step(dt, t, hands); },
-  // the ghost fingers: holding the cube, touching it, or neither
-  ghostColour: (id, own) => (cube.held && cube.held.by === id ? GHOST_COLOURS.hold : cube.nearest(own.filter((s) => s.id === id)) < 0.01 ? GHOST_COLOURS.touch : GHOST_COLOURS.idle),
+  // the ghost fingers: green while the hand pinches, orange while it makes a fist (the engine's grips: what can take the cube)
+  ghostColour: 'grips',
   // the cube's one action: put it half a metre in front of the menu's owner
   onAction: (id, from) => {
     if (id !== 'cubeHere') return;
