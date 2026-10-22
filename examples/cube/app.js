@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { enterXR } from '/mumr/xr/session.js';
-import { readInput } from '/mumr/xr/input.js';
+import { readInput, readLegs } from '/mumr/xr/input.js';
 import { makeGhost, GHOST_COLOURS } from '/mumr/xr/ghost.js';
 import { createPlayers, PLAYER_COLOURS } from '/mumr/xr/players3d.js';
 import { makePanels } from '/mumr/xr/panel3d.js';
@@ -43,7 +43,7 @@ const info = await fetch('/info').then((r) => r.json()).catch(() => ({ build: 0 
 const NAME = QS.get('name') || (QUEST ? 'Quest' : 'PC tab');
 const life = M.life.make({ name: NAME });
 life(`page loaded (${navigator.userAgent.slice(0, 80)})`);
-document.addEventListener('visibilitychange', () => life(`page ${document.visibilityState}`));
+document.addEventListener('visibilitychange', () => { life(`page ${document.visibilityState}`); if (document.hidden && !xr) away(); });
 const link = M.link.connect(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`, { build: info.build, name: NAME });
 link.onNote = (n) => life(`link: ${n}`);
 const S = new M.session.Session(link, { game: C.GAME, player: C.PLAYER, actions: C.ACTIONS, press: C.press });
@@ -62,7 +62,11 @@ link.onBin = (b) => {
 S.on('action', (id, from) => action(id, from));
 S.on('press', (id, from) => { if (from !== S.me) say(`Player ${from + 1} pressed ${id} on your menu`); });
 S.on('peer', (slot, on) => { say(on ? `Player ${slot + 1} is here` : `Player ${slot + 1} left`); life(`peer ${slot + 1} ${on ? 'joined' : 'left'}`); });
-S.on('token', (t, mine) => { if (t === 'cube') life(`cube: ${mine ? 'simulated here' : `simulated by player ${(S.holder('cube') ?? -1) + 1}`}`); });
+S.on('token', (t, mine) => { if (t === 'cube') life(`cube: ${mine ? 'simulated here' : `simulated by player ${(S.holder('cube') ?? -1) + 1}`}`); if (mine && document.hidden && !xr) away(); });
+// a page nobody looks at (a hidden tab, a headset taken off) draws no frames: it must not hold the cube, or nobody sees it move
+// (also when the frame loop has stopped without the page saying it is hidden: a paused tab, a frozen page)
+setInterval(() => { if (performance.now() - last > 1000) away(); }, 500);
+function away() { if (S.connected && S.holds('cube') && S.others) { S.release('cube'); life('cube: given up (this page is not looked at)'); } }
 S.on('leave', (why) => { if (why === 'version') say('This page is older than the server\'s: reload it'); });
 if (QS.has('frame')) {
   const [x, y, deg] = QS.get('frame').split(',').map(Number);
@@ -85,7 +89,7 @@ let xr = null, keeper = null;
 if (navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSupported('immersive-ar').then((ok) => { $('enter').hidden = !ok; if (!ok) $('xrNote').textContent = 'no mixed reality in this browser: desktop rehearsal'; });
 $('enter').onclick = async () => {
   try {
-    xr = await enterXR({ renderer, life, onReset: (F) => keeper && keeper.reset(F), onEnd: ended });
+    xr = await enterXR({ renderer, life, onReset: (F) => keeper && keeper.reset(F), onEnd: ended, onVisibility: (v) => { if (v === 'hidden') away(); } });
   } catch (e) { $('xrNote').textContent = `Could not start mixed reality: ${e && e.message ? e.message : e}`; return; }
   scene.background = null; grid.visible = false; mouseDot.visible = false;
   lineup.restart();
@@ -98,23 +102,23 @@ function ended() { xr = null; keeper = null; lineup.setKeeper(null); lineup.rest
 
 // ---- the desktop: the mouse as a fingertip on the floor, clicks on any menu
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hitP = new THREE.Vector3();
-let mouse = null;              // { x, y } on the floor plan while the left button is down
+let mouse = null;              // { x, y, pinch (Shift held) } on the floor plan while the left button is down
 const panelsAll = new Map();   // key -> { panel, owner, id, lay, pose }
 function pointer(ev) { const r = canvas.getBoundingClientRect(); ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, camera); }
 canvas.addEventListener('pointerdown', (ev) => {
   if (ev.button !== 0 || xr) return;
   pointer(ev);
-  const meshes = [...panelsAll.values()].map((q) => q.panel.mesh), hit = ray.intersectObjects(meshes, false)[0];
+  const meshes = [...panelsAll.values()].map((q) => q.panel.plane), hit = ray.intersectObjects(meshes, false)[0];
   if (hit) {
-    const q = [...panelsAll.values()].find((v) => v.panel.mesh === hit.object), n = M.menus.axes(q.pose).normal;
+    const q = [...panelsAll.values()].find((v) => v.panel.plane === hit.object), n = M.menus.axes(q.pose).normal;
     if (ray.ray.direction.x * n[0] + ray.ray.direction.y * n[1] + ray.ray.direction.z * n[2] > 0) return;      // (from behind: a blank wall)
     const id = M.menus.hit(q.lay, hit.uv.x, 1 - hit.uv.y);
     if (id) pressed(q.owner, id);
     return;
   }
-  if (ray.ray.intersectPlane(floorPlane, hitP)) { mouse = { x: hitP.x, y: -hitP.z }; canvas.setPointerCapture(ev.pointerId); }
+  if (ray.ray.intersectPlane(floorPlane, hitP)) { mouse = { x: hitP.x, y: -hitP.z, pinch: ev.shiftKey }; canvas.setPointerCapture(ev.pointerId); }
 });
-canvas.addEventListener('pointermove', (ev) => { if (!mouse) return; pointer(ev); if (ray.ray.intersectPlane(floorPlane, hitP)) mouse = { x: hitP.x, y: -hitP.z }; });
+canvas.addEventListener('pointermove', (ev) => { if (!mouse) return; pointer(ev); if (ray.ray.intersectPlane(floorPlane, hitP)) mouse = { x: hitP.x, y: -hitP.z, pinch: ev.shiftKey }; });
 canvas.addEventListener('pointerup', () => { mouse = null; });
 canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
 let pressedLook = { key: null, id: null, t: -1e9 };
@@ -125,7 +129,8 @@ function pressed(owner, id) {
 }
 
 // ---- every frame
-let head = [0, 0, 0, 1.6, 0], last = performance.now(), redrawAt = 0;
+let head = [0, 0, 0, 1.6, 0], last = performance.now(), redrawAt = 0, drag = null;
+const handPinch = new Map();
 const v3 = new THREE.Vector3();
 function readHead(frame) {
   if (frame && xr) {
@@ -142,10 +147,11 @@ function onFrame(time, frame) {
   if (keeper && frame) keeper.update();
   head = readHead(frame);
   // this page's hands: in mixed reality the tracked hands; on the desktop the mouse while its button is down
-  let own = [], tips = [];
+  let own = [], tips = [], legs = [], handsXR = [];
   if (xr && frame) {
     const r = readInput(xr, frame, space, pinch);
-    own = r.sources; tips = r.hands.map((h) => ({ id: h.id, p: h.tip }));
+    own = r.sources; handsXR = r.hands; tips = r.hands.map((h) => ({ id: h.id, p: h.tip }));
+    legs = readLegs(xr, frame, space);
     const st = S.stateOf(null);
     for (const id of ['left', 'right']) {
       const h = r.hands.find((q) => q.id === id && q.jp), g = ghosts[id];
@@ -154,14 +160,15 @@ function onFrame(time, frame) {
       g.update(h.jp, h.jr, held ? GHOST_COLOURS.hold : near ? GHOST_COLOURS.touch : GHOST_COLOURS.idle);
     }
   } else if (mouse) {
-    own = [{ id: 'mouse', points: [{ name: 'index', x: mouse.x, y: mouse.y, z: 0.05 }] }];
+    // (Shift held: the thumb and the index touch, a pinch: it picks the cube up when it starts at the cube)
+    own = [{ id: 'mouse', pinch: !!mouse.pinch, points: [{ name: 'index', x: mouse.x, y: mouse.y, z: 0.05 }, { name: 'thumb', x: mouse.x, y: mouse.y, z: 0.05 }] }];
   }
   mouseDot.visible = !xr && !!mouse;
   if (mouse) mouseDot.position.set(mouse.x, 0.05, -mouse.y);
   // lining up, then everything that is shared
   lineup.update(now, dt, M.hands.tips(own, Object.fromEntries(own.map((s) => [s.id, !!s.pinch]))));
   S.tick(now);
-  presence.send(now, head, own);
+  presence.send(now, head, own.concat(legs));
   const all = presence.hands(lineup.active ? [] : own, now);         // (a hand that lines up does not push the cube)
   if (!lineup.active) body.frame(now, own);
   cube.step(dt, now / 1000, all);
@@ -187,14 +194,30 @@ function onFrame(time, frame) {
     for (const k of r.busy) busyKeys.add(k);
     for (const pr of r.presses) pressed(pr.owner, pr.button);
   }
-  if (xr) follower.update({ x: head[0], y: head[1], th: head[2], py: head[3] + space.floorY }, dt, busyKeys.has('own:main'));
+  // the handle under our menu: a pinch that starts at it carries the menu; where it is let go is where it stays (and how far and how high
+  // it keeps to us from then on: follow.js place)
+  let handle = 'idle';
+  const hd = { x: head[0], y: head[1], th: head[2], py: head[3] + space.floorY };
+  for (const h of handsXR) {
+    const d = M.menus.handleDist(follower.pose, list[0].h, h.at), was = handPinch.get(h.id) || false;
+    handPinch.set(h.id, h.pinch);
+    if (d < 0.06) { handle = 'near'; busyKeys.add('own:main'); }
+    if (!drag && h.pinch && !was && d < 0.05) { const P = follower.pose; drag = { id: h.id, off: [P.x - h.at[0], P.h - h.at[1], P.y + h.at[2]] }; }
+  }
+  if (drag) {
+    const h = handsXR.find((q) => q.id === drag.id);
+    if (!h || !h.pinch) drag = null;
+    else { follower.place(h.at[0] + drag.off[0], -h.at[2] + drag.off[2], h.at[1] + drag.off[1], hd); handle = 'held'; busyKeys.add('own:main'); }
+  }
+  if (xr) follower.update(hd, dt, busyKeys.has('own:main'));
   list[0].pose = follower.pose;
   menus.send(now, [{ id: 'main', pose: follower.pose }], ownInfo);
   const redraw = now - redrawAt > 100;
   if (redraw) redrawAt = now;
   for (const pn of list) {
     let q = panelsAll.get(pn.key);
-    if (!q) { q = { panel: new Panel(pn.w, pn.lay) }; panelsAll.set(pn.key, q); scene.add(q.panel.mesh); }
+    if (!q) { q = { panel: new Panel(pn.w, pn.lay, { handle: pn.owner === null }) }; panelsAll.set(pn.key, q); scene.add(q.panel.mesh); }
+    if (pn.owner === null) q.panel.handleLook(handle);
     Object.assign(q, { owner: pn.owner, id: pn.id, lay: pn.lay, pose: pn.pose });
     q.panel.pose(pn.pose);
     if (redraw || pressedLook.key === pn.key) {
@@ -219,7 +242,7 @@ function status(now) {
   const holder = S.holder('cube');
   $('status').textContent = [
     `${S.connected ? `player ${S.me + 1} of ${S.others + 1}` : 'alone'}${S.viewers ? `, ${S.viewers} watching` : ''}   ${lineup.note()}   cube: ${body.mine ? 'simulated here' : holder === null ? 'nobody' : `player ${holder + 1}`}${cube.held ? ', held' : ''}   round trip ${link.rtt ?? '-'} ms`,
-    xr ? `xr: ${xr.features.join(', ')}; shared space: ${xr.shared.state}${xr.shared.uuid ? ` (${xr.shared.uuid})` : ''}; anchor: ${keeper && keeper.anchor ? (keeper.lost ? 'lost' : 'tracked') : 'none'}` : 'desktop: left button = a fingertip on the floor, right button turns the view, click a menu to press it',
+    xr ? `xr: ${xr.features.join(', ')}; shared space: ${xr.shared.state}${xr.shared.uuid ? ` (${xr.shared.uuid})` : ''}; anchor: ${keeper && keeper.anchor ? (keeper.lost ? 'lost' : 'tracked') : 'none'}` : 'desktop: left button = a fingertip on the floor (with Shift: a pinch, it picks the cube up), right button turns the view, click a menu to press it',
     ...life.lines().slice(-3),
   ].join('\n');
 }
@@ -232,4 +255,4 @@ addEventListener('resize', resize); resize();
 renderer.setAnimationLoop(onFrame);
 // a page of another build reloads itself (outside mixed reality): a headset never runs an old page by accident
 setInterval(async () => { if (xr) return; try { const i = await (await fetch('/info')).json(); if (i.build && info.build && i.build !== info.build) location.reload(); } catch (e) { /* the server is away */ } }, 3000);
-window.__cube = { S, link, lineup, cube, body, presence, menus, space, life, frame: () => onFrame(performance.now(), null), press: pressed, poke: (x, y) => { mouse = x === undefined ? null : { x, y }; } };
+window.__cube = { S, link, lineup, cube, body, presence, menus, space, life, panels: panelsAll, camera, controls, frame: () => onFrame(performance.now(), null), press: pressed, poke: (x, y) => { mouse = x === undefined ? null : { x, y }; } };

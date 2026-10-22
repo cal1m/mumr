@@ -46,6 +46,12 @@
     const ry = Math.atan2(Math.cos(p.yaw), -Math.sin(p.yaw)), sp = Math.sin(p.pitch || 0), cp = Math.cos(p.pitch || 0), sr = Math.sin(ry), cr = Math.cos(ry);
     return { pos: [p.x, p.h, -p.y], right: [cr, 0, -sr], up: [-sr * sp, cp, -cr * sp], normal: [sr * cp, sp, cr * cp], ry, pitch: p.pitch || 0 };
   }
+  // How far an XR point is from the handle under a panel (a bar HALF either side of the middle, GAP below the bottom edge): metres
+  function handleDist(pose, h, p, gap = 0.035, half = 0.07) {
+    const A = axes(pose), c = [0, 1, 2].map((i) => A.pos[i] - A.up[i] * (h / 2 + gap)), d = [p[0] - c[0], p[1] - c[1], p[2] - c[2]];
+    const along = d[0] * A.right[0] + d[1] * A.right[1] + d[2] * A.right[2], k = Math.max(-half, Math.min(half, along));
+    return Math.hypot(d[0] - A.right[0] * k, d[1] - A.right[1] * k, d[2] - A.right[2] * k);
+  }
   const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
   // Fingertips through panels. A press is a tip that was more than 4 mm in front of a button and is now at or behind its surface,
@@ -127,5 +133,5 @@
     }
   }
 
-  M.menus = { grid, hit, axes, Poke, Menus, TITLE_H, PAD };
+  M.menus = { grid, hit, axes, handleDist, Poke, Menus, TITLE_H, PAD };
 })(typeof module !== 'undefined' ? (module.exports = require('./ns.js')) : (globalThis.MUMR = globalThis.MUMR || {}));

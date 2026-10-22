@@ -1,7 +1,6 @@
 // The cube demo's own logic, with no THREE and no DOM (the headset page, the PC view and the Node tests all use it):
-//   * the CUBE: a 12 cm cube on the floor. Every hand pushes it (each fingertip, the palm and every joint), and it is HELD when a thumb
-//     and another fingertip touch it from opposite sides (the literal physical rule from Nudgy: no gesture, no pinch-in-the-air). It
-//     falls when let go, slides and slows on the floor;
+//   * the CUBE: a 12 cm cube on the floor. Every hand pushes it (each fingertip, the palm and every joint), and it is HELD only by a
+//     pinch (index and thumb touching each other) that starts at the cube. It falls when let go, slides and slows on the floor;
 //   * its BODY adapter (MUMR body.js): the token 'cube' follows touch, the holder sends packet 16;
 //   * the MENU: the same layout for this player's menu, another player's menu, and the PC view.
 // The cube is simulated on this page's floor plan (x, y on the floor, z = height of its middle above this headset's floor).
@@ -9,7 +8,7 @@
   const M = typeof module !== 'undefined' ? require('../../client/index.js') : globalThis.MUMR;
   const SIZE = 0.12, HALF = SIZE / 2;
   const COLOURS = ['#e8a33d', '#4ea1ff', '#7bd88f', '#ff6b81', '#c792ea'];
-  const DEF = { gravity: 9.81, friction: 3.0, touch: 0.012, grab: 0.015, letGo: 0.035, smooth: 12, snap: 0.25, reach: 0.06, busy: 0.02 };
+  const DEF = { gravity: 9.81, friction: 3.0, touch: 0.012, grab: 0.02, smooth: 12, snap: 0.25, reach: 0.06, busy: 0.02 };
 
   // packet 16: x, y, z, yaw, vx, vy, vz (common frame), flags (1: held)
   M.wire.register({ type: 16, name: 'cube', token: 'cube',
@@ -17,13 +16,21 @@
     unpack: (d) => { if (d.byteLength !== 32) return null; const s = []; for (let i = 0; i < 8; i++) s.push(d.getFloat32(i * 4, true)); return s.every(Number.isFinite) ? s : null; },
     blend: (a, b, f) => a.map((v, i) => (i === 3 ? v + Math.atan2(Math.sin(b[3] - v), Math.cos(b[3] - v)) * f : i === 7 ? a[7] : v + (b[i] - v) * f)) });
 
+  // where a hand pinches: between the thumb and index tips (a controller: its tip, the trigger is the pinch)
+  function pinchPoint(s) {
+    const pts = s.points || [], th = pts.find((p) => p.name === 'thumb'), ix = pts.find((p) => p.name === 'index'), c = pts.find((p) => p.name === 'ctrl');
+    if (th && ix) return [(th.x + ix.x) / 2, (th.y + ix.y) / 2, (th.z + ix.z) / 2];
+    return c ? [c.x, c.y, c.z] : null;
+  }
+
   class Cube {
     constructor(cfg = {}) {
       this.cfg = Object.assign({}, DEF, cfg);
       this.x = 0.5; this.y = 0; this.z = HALF; this.yaw = 0; this.vx = 0; this.vy = 0; this.vz = 0; this.wz = 0;
-      this.held = null;                     // { by: source id, off: [dx, dy, dz] } while a thumb and a finger hold it
+      this.held = null;                     // { by: source id, off: [dx, dy, dz] } while a pinch holds it
       this.off = { x: 0, y: 0, z: 0, yaw: 0 }; // drawn = simulated + this (a correction from the holder, fading)
       this.prev = new Map();                // source id + point -> [x, y, z, t]: for the hands' speed
+      this.pinched = new Map();             // source id -> was it pinching in the last step (a hold starts when a pinch starts)
       this.touched = false;
     }
     // a point in the cube's own frame (its middle, turned with it)
@@ -47,30 +54,29 @@
     step(dt, t, sources) {
       const C = this.cfg, seen = new Set();
       this.touched = false;
-      // holding: a thumb and another fingertip touch it from opposite sides
+      // holding: ONLY a pinch (the index and the thumb touching each other: the headset's pinch, or the tips within 22 mm) that starts
+      // with its middle at the cube. It holds while the fingers touch and lets go when they part. Nothing cleverer (Marek, 2026-10-10
+      // and again 2026-10-22: "only grab if fingers are touching each other").
       for (const s of sources || []) {
+        if (s.foot) continue;
         seen.add(s.id);
-        const th = (s.points || []).find((p) => p.name === 'thumb'), others = (s.points || []).filter((p) => p.name !== 'thumb' && p.name !== 'palm');
-        if (!th) continue;
-        const lt = this.local(th.x, th.y, th.z), dt0 = this.dist(th.x, th.y, th.z);
-        const opp = others.find((p) => { const l = this.local(p.x, p.y, p.z); return this.dist(p.x, p.y, p.z) < C.grab && lt[0] * l[0] + lt[1] * l[1] + lt[2] * l[2] < 0; });
-        if (!this.held && dt0 < C.grab && opp) {
-          const mid = [(th.x + opp.x) / 2, (th.y + opp.y) / 2, (th.z + opp.z) / 2];
-          this.held = { by: s.id, finger: opp.name, off: [this.x - mid[0], this.y - mid[1], this.z - mid[2]] };
-        }
+        const at = pinchPoint(s), was = this.pinched.get(s.id) || false, now = !!s.pinch && !!at;
+        this.pinched.set(s.id, now);
+        if (!at) continue;
+        if (!this.held && now && !was && this.dist(at[0], at[1], at[2]) < C.grab) this.held = { by: s.id, off: [this.x - at[0], this.y - at[1], this.z - at[2]] };
         if (this.held && this.held.by === s.id) {
-          const f = (s.points || []).find((p) => p.name === this.held.finger);
-          if (!f || dt0 > C.letGo || this.dist(f.x, f.y, f.z) > C.letGo) { this.held = null; continue; }
-          const mid = [(th.x + f.x) / 2, (th.y + f.y) / 2, (th.z + f.z) / 2], o = this.held.off;
-          const nx = mid[0] + o[0], ny = mid[1] + o[1], nz = Math.max(HALF, mid[2] + o[2]);
+          if (!now) { this.held = null; continue; }
+          const o = this.held.off, nx = at[0] + o[0], ny = at[1] + o[1], nz = Math.max(HALF, at[2] + o[2]);
           if (dt > 0) { this.vx = (nx - this.x) / dt; this.vy = (ny - this.y) / dt; this.vz = (nz - this.z) / dt; }
           this.x = nx; this.y = ny; this.z = nz; this.touched = true;
         }
       }
+      for (const id of [...this.pinched.keys()]) if (!seen.has(id)) this.pinched.delete(id);
       if (this.held && !seen.has(this.held.by)) this.held = null;            // the hand was lost: it falls
       // pushing: every point and joint of every hand that is in the cube moves it out, with the hand's speed
       if (!this.held) {
         for (const s of sources || []) {
+          if (s.foot) continue;                                              // (legs are drawn, they do not push)
           const pts = (s.points || []).map((p) => [p.x, p.y, p.z]).concat(s.joints || []);
           pts.forEach((p, i) => {
             const v = this._vel(`${s.id}:${i}`, p, t), l = this.local(p[0], p[1], p[2]), r = C.touch;
@@ -113,6 +119,7 @@
         return [p[0], p[1], p[2], space.yawToCommon(cube.yaw), v[0], v[1], cube.vz, cube.held ? 1 : 0];
       },
       apply: (s, info) => {
+        if (!space.ok) return false;
         const p = space.fromCommon([s[0], s[1], s[2]]), v = rot(-space.frame.yaw, s[4], s[5]), was = cube.drawn();
         cube.x = p[0]; cube.y = p[1]; cube.z = p[2]; cube.yaw = space.yawFromCommon(s[3]); cube.vx = v[0]; cube.vy = v[1]; cube.vz = s[6]; cube.wz = 0; cube.held = null;
         const far = info.first || Math.hypot(was.x - cube.x, was.y - cube.y, was.z - cube.z) > C.snap;

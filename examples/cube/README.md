@@ -1,8 +1,9 @@
 # The MUMR cube
 
-One 12 cm cube on the floor that every player can push with bare hands and pick up (a thumb and another fingertip touching it from
-opposite sides), a menu that every player can press, everybody's hands and heads, lining up on the printed crosses, and a PC view.
-Built on 2026-10-22 and rehearsed in browser tabs on the PC. **It has not run on a headset yet.**
+One 12 cm cube on the floor that every player can push with bare hands and pick up (a pinch: index and thumb touching each other, that
+starts at the cube; it holds while they touch), a menu that every player can press and its owner can carry by the handle under it,
+everybody's hands, heads and legs (from body tracking, or estimated from the head), lining up on the printed crosses, and a PC view.
+Built on 2026-10-22; run once on one Quest Pro the same day (five faults found and fixed); not yet on two headsets.
 
 ## On two headsets
 
@@ -30,8 +31,9 @@ py -3 server/serve.py examples/cube 8766 --http --no-browser
 
 Two tabs: `http://localhost:8766/?name=A&frame=0,0,0` and `http://localhost:8766/?name=B&frame=1,0.5,40` (a pretend line-up: where
 the common frame lies in that tab's own floor plan, in metres and degrees). Left button on the floor = a fingertip (it pushes the cube,
-and rests on a spot while lining up), right button turns the view, a click on a menu presses it (also on the other tab's menu). A tab in
-the background gets no animation frames: `__cube.frame()` steps it by hand.
+and rests on a spot while lining up; with Shift it is a pinch, which picks the cube up), right button turns the view, a click on a menu
+presses it (also on the other tab's menu). A tab in the background gets no animation frames and gives the cube up: `__cube.frame()`
+steps it by hand. A pretend second player without a browser: `node tools/standin.js ws://localhost:8766/ws stand-in 1,0.5,40`.
 
 ## Files
 

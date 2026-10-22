@@ -78,7 +78,7 @@
       const S = this.session, s = M.wire.spec(this.type);
       if (!p || !s || p.type !== s.type) return false;
       this.stats.got++;
-      if (S.holds(this.token) || p.slot !== S.holder(this.token)) return false;
+      if (!S.sharing() || S.holds(this.token) || p.slot !== S.holder(this.token)) return false;      // (not lined up: the common frame means nothing here yet)
       if (!this.guard.fresh(p.type, p.slot, p.clock)) { this.stats.old++; return false; }
       const ok = this.a.apply(p.data, { slot: p.slot, clock: p.clock, now: nowMs, first: this._first });
       if (ok !== false) { this.stats.applied++; this._first = false; }

@@ -20,21 +20,29 @@ test('a fingertip that moves into the cube pushes it along, and it slides to a s
   assert.ok(Math.abs(c.y) < 0.02);
 });
 
-test('a thumb and a finger on opposite sides hold it; it goes up with the hand and falls when let go', () => {
+test('only a pinch that starts at the cube holds it; it goes up with the hand and falls when the fingers part', () => {
   const c = new C.Cube();
   c.place(0, 0);
-  const hold = (z, gap) => ({ id: 'left', points: [pt('thumb', -C.HALF - gap, 0, z), pt('index', C.HALF + gap, 0, z)] });
+  const hand = (x, z, pinch) => ({ id: 'left', pinch, points: [pt('thumb', x - 0.005, 0, z), pt('index', x + 0.005, 0, z)] });
   let t = 0;
-  c.step(0.016, t += 0.016, [hold(C.HALF, 0.005)]);
-  assert.ok(c.held && c.held.by === 'left');
-  for (let k = 1; k <= 20; k++) c.step(0.016, t += 0.016, [hold(C.HALF + k * 0.01, 0.005)]);
+  c.step(0.016, t += 0.016, [hand(C.HALF + 0.01, C.HALF, false)]);
+  c.step(0.016, t += 0.016, [hand(C.HALF + 0.01, C.HALF, true)]);
+  assert.ok(c.held && c.held.by === 'left', 'pinched at its side');
+  for (let k = 1; k <= 20; k++) c.step(0.016, t += 0.016, [hand(C.HALF + 0.01, C.HALF + k * 0.01, true)]);
   assert.ok(Math.abs(c.z - (C.HALF + 0.2)) < 1e-6, `lifted 20 cm: ${c.z}`);
-  c.step(0.016, t += 0.016, [hold(C.HALF + 0.2, 0.06)]);
-  assert.strictEqual(c.held, null, 'the fingers opened');
+  c.step(0.016, t += 0.016, [hand(C.HALF + 0.01, C.HALF + 0.2, false)]);
+  assert.strictEqual(c.held, null, 'the fingers parted');
   for (let k = 0; k < 60; k++) c.step(0.016, t += 0.016, []);
   assert.ok(Math.abs(c.z - C.HALF) < 1e-6, 'on the floor again');
-  c.step(0.016, t += 0.016, [{ id: 'r', points: [pt('index', 0, 0, C.HALF), pt('thumb', 0.3, 0, C.HALF)] }]);
-  assert.strictEqual(c.held, null, 'one finger alone does not hold it');
+  // a pinch that started away from the cube and then came to it does not take it; nor do a thumb and a finger on opposite sides
+  c.step(0.016, t += 0.016, [hand(0.3, C.HALF, true)]);
+  c.step(0.016, t += 0.016, [hand(C.HALF + 0.01, C.HALF, true)]);
+  assert.strictEqual(c.held, null, 'the pinch has to start at the cube');
+  c.step(0.016, t += 0.016, [{ id: 'r', pinch: false, points: [pt('thumb', -C.HALF - 0.005, 0, C.HALF), pt('index', C.HALF + 0.005, 0, C.HALF)] }]);
+  assert.strictEqual(c.held, null, 'fingers that do not touch each other do not hold it');
+  c.place(0, 0);
+  c.step(0.016, t += 0.016, [{ id: 'leg', foot: true, points: [pt('ankle', 0.05, 0, 0.05)] }]);
+  assert.ok(Math.abs(c.x) < 1e-6, 'a leg does not push it');
 });
 
 test('two headsets: B pushes the cube, takes the token by touching it, and A sees it where B has it in the room', () => {

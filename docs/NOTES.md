@@ -84,6 +84,18 @@ Each item: what is there now in Nudgy, why it costs, what MUMR does instead. **D
 21. **A menu is a function of its owner's state and info**, for this player's menu, another player's and the PC view alike
     (`cube.menu(state, info)`): one layout, drawn three ways. That is the generic form of Nudgy's M4 rule.
 
+22. **A texture keeps the size of its first upload** (first headset run, 2026-10-22: the line-up menu only stretched). A canvas that
+    changes size needs a new texture: `panel3d.js` makes one. **Done.**
+23. **Watchers were not told who holds a body when its token was handed out on a player's join** (the PC view said nobody
+    simulated the cube). The hub now sends the token to everyone. **Done**, with a test.
+24. **A body could be applied before the page was lined up** and crashed it (`Space` without a frame): `Body.receive` now takes
+    state only while sharing, as Nudgy's `Share` did. **Done**, with a test.
+25. **A page nobody looks at held the cube** (a background tab: its timers still ping, so the hub's silence rule never fires, but it
+    draws no frames, so nobody saw the cube move). Rule: a hidden page, a headset taken off (XR visibility `hidden`) or a page whose
+    frame loop has stopped for a second releases its bodies; the hub gives a released body to the earliest other player. **Done.**
+26. **A Wi-Fi stall of 4 s made the headset reconnect as a new player** (first run, 18:11:27), so its tokens and slot changed. Not
+    fixed yet: a resume (the same slot back with the join key, within a few seconds) would keep a player's place.
+
 ## 3. Things that must not be lost (from the Nudgy build)
 
 Kept from the first plan's section 6, plus what came after it:
@@ -137,3 +149,12 @@ Kept from the first plan's section 6, plus what came after it:
   0.729 against 0.73 m; B pressed A's buttons; B's Line up put A into line-up mode and B saw it; A lined up with the mouse, 200 cm),
   and the PC view showed the cube, the count, both heads and both menus. Not ported: Nudgy's depth-only hand mask and the cut-out
   of the hand in front of a menu (the ghost fingers are drawn over the menus). Nothing has run on a headset.
+- **2026-10-22, first headset run (Quest Pro, one headset)**, Marek: the line-up menu only stretched; legs were missing (not
+  interactive, but visible); the menu had no handle; the cube grab broke his rule ("only grab if fingers are touching each other
+  (index and thumb)"); the PC view (Firefox) was super laggy. From the server log: the PC view could not take its packets (10-170
+  replaced every 2 s), a 4 s Wi-Fi stall made the headset reconnect, the `shared` space was granted (his flag is on) but had no UUID
+  alone. Fixed: items 22-25; a handle to carry the menu; the grab is only a pinch (index and thumb touching) that starts at the
+  cube, held while they touch; legs from body tracking or estimated from the head, drawn for the others and on the PC; the PC view
+  draws at pixel ratio 1, redraws a menu only when it changed, falls back to the arrival time when a clock is far off, reloads
+  itself on a new build and writes its frame rate and packet rate to the server log every 10 s (in Chromium here: 41-60 fps). Why
+  Firefox was slow is not proven; its next log lines will say. `tools/standin.js`: a pretend player for rehearsals.

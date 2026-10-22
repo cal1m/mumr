@@ -24,6 +24,27 @@ function readJoints(frame, hand, ref, out) {
   return true;
 }
 
+// The legs from body tracking (frame.body, Meta's joint names; Nudgy read left-foot-ankle and left-foot-ball on a Quest Pro): two sources
+// marked foot, to draw only. [] when the browser gives no body.
+const LEG_JOINTS = { hip: 'upper-leg', knee: 'lower-leg', ankle: 'foot-ankle', toe: 'foot-ball' };
+export function readLegs(xr, frame, space) {
+  const body = frame && frame.body, out = [];
+  if (!body || !body.get) return out;
+  try {
+    for (const side of ['left', 'right']) {
+      const points = [];
+      for (const [name, joint] of Object.entries(LEG_JOINTS)) {
+        const sp = body.get(`${side}-${joint}`), p = sp && frame.getPose(sp, xr.refSpace);
+        if (!p) break;
+        const q = p.transform.position;
+        points.push({ name, x: q.x, y: -q.z, z: q.y - space.floorY });
+      }
+      if (points.length === 4) out.push({ id: `${side}-foot`, foot: true, noHold: true, points });
+    }
+  } catch (e) { /* a browser whose body has other joints: no legs, nothing else breaks */ }
+  return out;
+}
+
 export function readInput(xr, frame, space, pinch) {
   const H = M().hands, ref = xr.refSpace, sources = [], hands = [];
   for (const src of xr.session.inputSources) {

@@ -66,6 +66,15 @@ test('the token follows touch: B reaches, takes it at once, keeps it while touch
   assert.strictEqual(b.body.send(1105), false, 'not more than 45 a second');
 });
 
+test('a page that is not lined up does not take the state of the holder (and does not break)', () => {
+  const hub = new Hub({ bodies: ['puck'], owned: { 16: 'puck' } });
+  const a = headset(hub, 'A', { x: 0, y: 0, yaw: 0, z: 0 }), b = headset(hub, 'B', { x: 1, y: 0.5, yaw: 0.7, z: 0 });
+  hub.flush();
+  a.S.setLined({ dist: 3 }); hub.flush();
+  assert.strictEqual(b.body.receive(M.wire.decode(Object.assign(M.wire.encode('puck', [1, 2, 0, 0], 5), { 1: 0 })), 0), false);
+  assert.strictEqual(b.body.stats.applied, 0);
+});
+
 test('a still body is sent slowly; nothing is sent when nobody can see it', () => {
   const { hub, a } = pair();
   assert.strictEqual(a.body.send(0), true);

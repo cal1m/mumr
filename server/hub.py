@@ -15,7 +15,8 @@ Text messages (dicts) from a player:
     {t:'ask', key, m}      a message for whoever OWNS the document entry `key`, and nobody else (it is not kept)
     {t:'claim', body}      ask for a token (any name the app likes, [A-Za-z0-9_.:-]{1,40})
     {t:'busy', body, on}   the holder says a hand is on the thing: nobody else gets the token meanwhile
-    {t:'release', body}    the holder gives it up (nobody holds it then, unless it is one of `bodies`)
+    {t:'release', body}    the holder gives it up: nobody holds it then, or for one of `bodies` the earliest other player (a page that
+                           nobody looks at: a hidden tab, a headset taken off)
     {t:'ping', c}          answered with {t:'pong', c, s}: s is the hub's clock (ms); also how the hub knows the page is alive
     {t:'clock', off}       the page's offset to the hub's clock (ms); passed on to everyone as {t:'clock', slot, off}
 
@@ -309,13 +310,15 @@ class Hub:
                 self._order += 1
                 self.peers[who] = {"text": send_text, "bin": send_bin, "name": name or "player %d" % (who + 1), "order": self._order,
                                    "last": self.now(), "conn": conn, "kill": kill}
-                for body in self.bodies:
-                    if self.tokens[body] is None:
-                        self.tokens[body] = who
-                        self.busy[body] = False
+                given = [body for body in self.bodies if self.tokens[body] is None]
+                for body in given:
+                    self.tokens[body] = who
+                    self.busy[body] = False
                 hello["tokens"] = dict(self.tokens)
                 self._text(who, hello, dead)
                 self._all({"t": "peer", "slot": who, "name": self.peers[who]["name"], "on": True}, dead, but=who)
+                for body in given:                              # (the viewers that are already here must hear it too)
+                    self._all({"t": "token", "body": body, "slot": who}, dead, but=who)
             for data in list(self.latest.values()):             # (the newest of everything that moves, so that it sees the world at once)
                 if data[1] == who:
                     continue
@@ -383,8 +386,13 @@ class Hub:
                     self.busy[body] = bool(msg.get("on"))
             elif t == "release":
                 body = msg.get("body")
-                if body in self.tokens and self.tokens[body] == who and body not in self.bodies:
-                    self._give(body, None, dead)
+                if body in self.tokens and self.tokens[body] == who:
+                    if body not in self.bodies:
+                        self._give(body, None, dead)
+                    else:                                           # (a body always has a holder: the earliest other one, if there is one)
+                        heir = min((s for s in self.peers if s != who), key=lambda s: self.peers[s]["order"], default=None)
+                        if heir is not None:
+                            self._give(body, heir, dead)
             elif t == "clock":
                 if _num(msg.get("off")):
                     self.clock_off[who] = float(msg["off"])

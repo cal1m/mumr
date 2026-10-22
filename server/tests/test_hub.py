@@ -73,6 +73,13 @@ class JoinTest(unittest.TestCase):
         self.assertEqual(join(h, role="feed").texts, [{"t": "refused", "why": "role"}])
         self.assertIsNone(h.join(lambda m: None, lambda b: None, {"t": "hello"}))
 
+    def test_a_watcher_that_came_first_hears_who_holds_a_body(self):
+        h = hub.Hub(lambda: BUILD, Clock(), bodies=("cube",))
+        v = join(h, "pc", role="viewer")
+        self.assertEqual(v.of("hello")[0]["tokens"], {"cube": None})
+        join(h, "p0")
+        self.assertEqual(v.of("token"), [{"t": "token", "body": "cube", "slot": 0}])
+
     def test_a_viewer_is_not_a_player(self):
         h, _, (a,) = make(1, bodies=("sim",))
         v = join(h, "pc", role="viewer")
@@ -214,7 +221,10 @@ class TokenTest(unittest.TestCase):
         h.text(0, {"t": "release", "body": "cube"})
         self.assertIsNone(h.tokens["cube"])
         h.text(0, {"t": "release", "body": "sim"})
-        self.assertEqual(h.tokens["sim"], 0, "a body always has a holder")
+        self.assertEqual(h.tokens["sim"], 1, "a body goes to the earliest other player")
+        h2, _, (only,) = make(1, bodies=("sim",))
+        h2.text(0, {"t": "release", "body": "sim"})
+        self.assertEqual(h2.tokens["sim"], 0, "and stays when there is nobody else")
         h.text(0, {"t": "claim", "body": "not a name!"})
         self.assertNotIn("not a name!", h.tokens)
 

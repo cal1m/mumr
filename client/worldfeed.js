@@ -27,7 +27,7 @@
       this.ready = false;
       this.bufs = new Map();              // name -> slot -> [{ t, arrived, clock, data }]
       this.guard = new M.wire.Guard();
-      this.counts = { packets: 0, ignored: 0 };
+      this.counts = { packets: 0, ignored: 0, offClock: 0 };
       this.session = new M.session.Session(this.link, opts.session || {});
       this.doc = this.session.doc;
       const S = this.session;
@@ -52,7 +52,10 @@
       if (!p) { this.counts.ignored++; return null; }
       if (!this.guard.fresh(p.type, p.slot, p.clock)) { this.counts.ignored++; return null; }
       const off = this.session.clocks.get(p.slot), sn = this.serverNow();
-      const t = off !== undefined ? p.clock + off : sn !== null ? sn : arrived;        // (until the sender's offset is known: when it came)
+      // the server's time of this sample: the sender's clock plus its offset; until that is known, or when it disagrees with when the packet
+      // came by more than half a second (a wrong offset would show the world up to KEEP late), when it came
+      let t = off !== undefined ? p.clock + off : sn !== null ? sn : arrived;
+      if (off !== undefined && sn !== null && Math.abs(t - sn) > 500) { t = sn; this.counts.offClock++; }
       let byName = this.bufs.get(p.name);
       if (!byName) this.bufs.set(p.name, byName = new Map());
       let buf2 = byName.get(p.slot);
@@ -103,7 +106,7 @@
     status() {
       const ages = {};
       for (const [name, byName] of this.bufs) ages[name] = [...byName.keys()].map((s) => [s, Math.round(this.age(name, s))]);
-      return { ready: this.ready, players: this.session.peers.size, events: this.session.n, packets: this.counts.packets, ignored: this.counts.ignored, clockSpreadMs: this.clockQuality, ages };
+      return { ready: this.ready, players: this.session.peers.size, events: this.session.n, packets: this.counts.packets, ignored: this.counts.ignored, offClock: this.counts.offClock, clockSpreadMs: this.clockQuality, ages };
     }
   }
 

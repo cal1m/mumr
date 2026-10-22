@@ -25,10 +25,11 @@ class Hub {
       sendBin(b) { if (!l.open) return false; hub.binary(l.slot, new Uint8Array(b)); return true; } };
     let id = role === 'viewer' ? 100 : 0;
     while (this.links.has(id)) id++;
-    if (role !== 'viewer') for (const b of this.bodies) if (this.tokens[b] === null) this.tokens[b] = id;
+    const given = role !== 'viewer' ? this.bodies.filter((b) => this.tokens[b] === null) : [];
+    for (const b of given) this.tokens[b] = id;
     this.links.set(id, l);
     this.queue.push([id, this._hello(id, role)]);
-    if (role !== 'viewer') { for (const s of this.links.keys()) if (s !== id) this.queue.push([s, { t: 'peer', slot: id, name, on: true }]); }
+    if (role !== 'viewer') { for (const s of this.links.keys()) if (s !== id) { this.queue.push([s, { t: 'peer', slot: id, name, on: true }]); for (const b of given) this.queue.push([s, { t: 'token', body: b, slot: id }]); } }
     else for (const s of this.links.keys()) if (s < 100) this.queue.push([s, { t: 'viewers', n: [...this.links.keys()].filter((k) => k >= 100).length }]);
     for (const [k, b] of this.latest) if (k % 256 !== id) this.queue.push([id, { bin: b }]);
     return l;
@@ -59,7 +60,11 @@ class Hub {
       if (!(m.body in this.tokens)) { this.tokens[m.body] = null; this.busy[m.body] = false; }
       if (this.tokens[m.body] !== who && !this.busy[m.body]) this.give(m.body, who);
     } else if (m.t === 'busy') { if (this.tokens[m.body] === who) this.busy[m.body] = !!m.on; }
-    else if (m.t === 'release') { if (this.tokens[m.body] === who && !this.bodies.includes(m.body)) this.give(m.body, null); }
+    else if (m.t === 'release') {
+      if (this.tokens[m.body] !== who) return;
+      if (!this.bodies.includes(m.body)) this.give(m.body, null);
+      else { const heir = [...this.links.keys()].filter((s) => s < 100 && s !== who).sort((x, y) => x - y)[0]; if (heir !== undefined) this.give(m.body, heir); }
+    }
     else if (m.t === 'clock') { this.clocks[who] = m.off; this.all({ t: 'clock', slot: who, off: m.off }, who); }
   }
   binary(who, b) {

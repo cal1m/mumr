@@ -75,7 +75,7 @@
 
   // ---- presence (P)
   const P = { ids: ['left', 'right', 'hand', 'left-foot', 'right-foot', 'mouse', 'remote', 'mouse-foot'],
-    names: ['index', 'thumb', 'middle', 'ring', 'pinky', 'palm', 'ctrl', 'toe', 'heel'] };
+    names: ['index', 'thumb', 'middle', 'ring', 'pinky', 'palm', 'ctrl', 'toe', 'heel', 'hip', 'knee', 'ankle'] };      // (appended: the first nine are Nudgy's numbers)
   const TIPS = { thumb: 4, index: 9, middle: 14, ring: 19, pinky: 24 }, PALM = [10, 11];
   const MAX_SOURCES = 8, MAX_POINTS = 12;
   const i16 = (v) => Math.max(-32767, Math.min(32767, Math.round(+v || 0)));

@@ -61,5 +61,25 @@
     return { d: best, source: who };
   }
 
-  M.hands = { J, TIP, PALM, PINCH_ON, PINCH_OFF, source, controller, Pinch, tips, nearest, tipsDist };
+  // LEGS, to draw (not to touch anything): from the body-tracking sources (id 'left-foot' / 'right-foot', foot: true, points hip,
+  // knee, ankle, toe) when a headset offers them, otherwise ESTIMATED from the head: hips at 53 % of the head's height, the feet under
+  // them on the floor. Quest's tracked legs are a guess from the head and hands too (Nudgy, 2026-10-12: they follow walking, not a
+  // single foot's swing). head: [x, y, heading, height, pitch] on the floor plan. -> [{ side, pts: [[x, y, z] x 4], estimated }]
+  const LEG = { hip: 0.53, knee: 0.28, apart: 0.09, back: 0.05, foot: 0.12 };
+  function legs(head, sources) {
+    const out = [];
+    for (const side of ['left', 'right']) {
+      const s = (sources || []).find((q) => q.id === `${side}-foot` && q.foot);
+      const by = (n) => { const p = s && s.points.find((q) => q.name === n); return p ? [p.x, p.y, p.z] : null; };
+      const pts = s ? ['hip', 'knee', 'ankle', 'toe'].map(by) : null;
+      if (pts && pts.every(Boolean)) { out.push({ side, pts, estimated: false }); continue; }
+      if (!head) continue;
+      const [x, y, th, h] = head, c = Math.cos(th), sn = Math.sin(th), sideK = side === 'left' ? 1 : -1;
+      const at = (fwd, lat, z) => [x + c * fwd - sn * lat * sideK, y + sn * fwd + c * lat * sideK, z];
+      out.push({ side, estimated: true, pts: [at(-LEG.back, LEG.apart, h * LEG.hip), at(-LEG.back + 0.03, LEG.apart, h * LEG.knee), at(-LEG.back, LEG.apart, 0.08), at(-LEG.back + LEG.foot, LEG.apart, 0.03)] });
+    }
+    return out;
+  }
+
+  M.hands = { J, TIP, PALM, PINCH_ON, PINCH_OFF, source, controller, Pinch, tips, nearest, tipsDist, legs, LEG };
 })(typeof module !== 'undefined' ? (module.exports = require('./ns.js')) : (globalThis.MUMR = globalThis.MUMR || {}));

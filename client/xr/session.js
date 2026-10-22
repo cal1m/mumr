@@ -1,6 +1,6 @@
 // Entering mixed reality, and the XR calls the plain modules need (an ES module; the page gives it THREE's renderer).
 //
-//   const xr = await enterXR({ renderer, life, onReset, onEnd, features })
+//   const xr = await enterXR({ renderer, life, onReset, onEnd, onVisibility, features })
 //   xr.session, xr.refSpace, xr.features (what the browser granted), xr.select (inputSource -> pinching, from select events)
 //   xr.anchorIO(storageKey)   the io for anchor.js Keeper (persistent anchor by its handle in localStorage)
 //   xr.frame                  the current XRFrame: set it at the start of every frame callback (anchors can only be made inside one)
@@ -9,12 +9,12 @@
 //
 // Every step goes to the life log, so a run on the headset says what the browser offered.
 const M = () => globalThis.MUMR;
-const OPTIONAL = ['hand-tracking', 'anchors', 'plane-detection', 'mesh-detection', 'shared'];
+const OPTIONAL = ['hand-tracking', 'anchors', 'plane-detection', 'mesh-detection', 'body-tracking', 'shared'];
 
-export async function enterXR({ renderer, life = () => {}, onReset = () => {}, onEnd = () => {}, features = OPTIONAL } = {}) {
+export async function enterXR({ renderer, life = () => {}, onReset = () => {}, onEnd = () => {}, onVisibility = () => {}, features = OPTIONAL } = {}) {
   const tries = [
     { requiredFeatures: ['local-floor'], optionalFeatures: features },
-    { requiredFeatures: ['local-floor'], optionalFeatures: features.filter((f) => f !== 'shared' && f !== 'mesh-detection') },
+    { requiredFeatures: ['local-floor'], optionalFeatures: features.filter((f) => f !== 'shared' && f !== 'mesh-detection' && f !== 'body-tracking') },
     { requiredFeatures: ['local-floor'], optionalFeatures: ['hand-tracking'] },
   ];
   let session = null, err = null;
@@ -27,7 +27,7 @@ export async function enterXR({ renderer, life = () => {}, onReset = () => {}, o
   life(`xr: session started; features ${xr.features.join(', ') || '(the browser does not say)'}`);
   session.addEventListener('selectstart', (e) => xr.select.set(e.inputSource, true));
   session.addEventListener('selectend', (e) => xr.select.set(e.inputSource, false));
-  session.addEventListener('visibilitychange', () => life(`xr: ${session.visibilityState}`));
+  session.addEventListener('visibilitychange', () => { life(`xr: ${session.visibilityState}`); onVisibility(session.visibilityState); });
   session.addEventListener('end', () => { life('xr: session ended'); onEnd(); });
   if (xr.refSpace && xr.refSpace.addEventListener) {
     xr.refSpace.addEventListener('reset', (ev) => {

@@ -1,7 +1,8 @@
 // A menu floating in the room, drawn from a menus.grid layout on a canvas (an ES module; the page gives it THREE).
 //
 //   const { Panel, drawGrid } = makePanels(THREE, renderer)
-//   const p = new Panel(widthMetres, lay)     p.mesh (add it to the scene), p.draw(lay, look), p.pose(pose) (menus.axes conventions)
+//   const p = new Panel(widthMetres, lay, { handle })   p.mesh (add it to the scene), p.plane (for a raycast), p.draw(lay, look),
+//                                             p.pose(pose) (menus.axes conventions), p.handleLook('idle' | 'near' | 'held')
 //   drawGrid(ctx, lay, look)                  look: { hover, pressed, edge (a colour: another player's menu), note }
 // Seen from behind a menu is a blank wall in its background colour (Nudgy, 2026-10-14: "make it so that menus from behind are just the
 // menu background color"). Nudgy's cut-out of the real hand in front of a menu is not here; the ghost fingers are drawn over it.
@@ -36,6 +37,8 @@ export function drawGrid(ctx, lay, look = {}) {
 function round(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 function fit(g, s, w) { if (g.measureText(s).width <= w) return s; while (s.length > 1 && g.measureText(s + '…').width > w) s = s.slice(0, -1); return s + '…'; }
 
+export const HANDLE_GAP = 0.035, HANDLE_HALF = 0.07;
+
 export function makePanels(THREE, renderer) {
   const VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
   const FS = `uniform sampler2D map; varying vec2 vUv;
@@ -44,28 +47,49 @@ export function makePanels(THREE, renderer) {
       gl_FragColor = c;
       #include <colorspace_fragment>
     }`;
+  const handleGeo = new THREE.CapsuleGeometry(0.008, HANDLE_HALF * 2, 4, 12); handleGeo.rotateZ(Math.PI / 2);
   class Panel {
-    constructor(width, lay) {
+    // width: metres; lay: a menus.grid layout; opts.handle: a bar under the panel to carry it by (this player's own menu only)
+    constructor(width, lay, opts = {}) {
       this.width = width; this.canvas = document.createElement('canvas'); this.ctx = this.canvas.getContext('2d');
-      this.tex = new THREE.CanvasTexture(this.canvas); this.tex.colorSpace = THREE.SRGBColorSpace;
-      if (renderer) this.tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-      this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({ transparent: true, side: THREE.DoubleSide, uniforms: { map: { value: this.tex } }, vertexShader: VS, fragmentShader: FS }));
-      this.mesh.renderOrder = 2;
-      this.lay = null; this.cur = null; this.drawnAt = -1e9;
+      this.mesh = new THREE.Group();                         // (posed; the plane is scaled inside it, the handle is not)
+      this.material = new THREE.ShaderMaterial({ transparent: true, side: THREE.DoubleSide, uniforms: { map: { value: null } }, vertexShader: VS, fragmentShader: FS });
+      this.plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.material);
+      this.plane.renderOrder = 2; this.mesh.add(this.plane);
+      this.handle = null;
+      if (opts.handle) {
+        this.handle = new THREE.Mesh(handleGeo, new THREE.MeshBasicMaterial({ color: 0xece9e2, transparent: true, opacity: 0.85 }));
+        this.mesh.add(this.handle);
+      }
+      this.tex = null; this.lay = null;
       if (lay) this.setLayout(lay);
     }
     get h() { return this.lay ? this.width * this.lay.h / this.lay.w : this.width; }
     setLayout(lay) {
       if (!this.lay || this.lay.w !== lay.w || this.lay.h !== lay.h) {
+        // A texture keeps the size of its first upload: a canvas of another size needs a new texture (or the old picture is shown,
+        // stretched: the line-up menu in the first headset run, 2026-10-22)
         this.canvas.width = lay.w; this.canvas.height = lay.h;
-        this.mesh.scale.set(this.width, this.width * lay.h / lay.w, 1);
+        if (this.tex) this.tex.dispose();
+        this.tex = new THREE.CanvasTexture(this.canvas); this.tex.colorSpace = THREE.SRGBColorSpace;
+        if (renderer) this.tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+        this.material.uniforms.map.value = this.tex;
+        const h = this.width * lay.h / lay.w;
+        this.plane.scale.set(this.width, h, 1);
+        if (this.handle) this.handle.position.set(0, -h / 2 - HANDLE_GAP, 0);
       }
       this.lay = lay;
     }
     draw(lay, look) { this.setLayout(lay); drawGrid(this.ctx, lay, look); this.tex.needsUpdate = true; }
+    // 'idle', 'near' (a hand is at it), 'held' (it is being carried)
+    handleLook(state) {
+      if (!this.handle) return;
+      this.handle.material.color.setHex(state === 'held' ? 0x4ea1ff : state === 'near' ? 0xf2c14e : 0xece9e2);
+      this.handle.scale.setScalar(state === 'idle' ? 1 : 1.3);
+    }
     // pose: { x, y (floor plan), h (XR height), yaw, pitch }, as menus.axes takes it
     pose(p) { this.mesh.position.set(p.x, p.h, -p.y); this.mesh.rotation.set(-(p.pitch || 0), Math.atan2(Math.cos(p.yaw), -Math.sin(p.yaw)), 0, 'YXZ'); this.mesh.updateMatrixWorld(true); }
-    dispose() { if (this.mesh.parent) this.mesh.parent.remove(this.mesh); this.mesh.geometry.dispose(); this.mesh.material.dispose(); this.tex.dispose(); }
+    dispose() { if (this.mesh.parent) this.mesh.parent.remove(this.mesh); this.plane.geometry.dispose(); this.material.dispose(); if (this.tex) this.tex.dispose(); if (this.handle) this.handle.material.dispose(); }
   }
   return { Panel, drawGrid };
 }
