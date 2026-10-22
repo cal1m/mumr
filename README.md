@@ -1,4 +1,4 @@
-# MUMR: multi-user mixed reality
+﻿# MUMR: multi-user mixed reality
 
 An engine for shared mixed-reality worlds in the browser: two to four people in one room wear headsets (Quest 3, Quest Pro; a WebXR page,
 nothing installed), see the same virtual things in the same real places, and touch them with their hands. A PC on the same network serves
@@ -56,4 +56,4 @@ py -3 -m unittest discover -s server/tests -p "test_*.py"
 Everything in the world is shared (every player sees it and can touch it, every PC view shows it); send in the common frame through
 `align.Space`; interaction is physical (a touch is a touch); logging runs all the time. How to build one: [docs/HOWTO-NEW-APP.md](docs/HOWTO-NEW-APP.md).
 
-Line endings are LF (`.gitattributes`). There is no login on the server: anyone on the network can open the pages. No licence yet.
+Line endings are LF (`.gitattributes`). There is no login on the server: anyone on the network can open the pages. MIT licence (LICENSE).
