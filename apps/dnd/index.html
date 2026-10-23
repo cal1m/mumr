@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DnD: player</title>
+<link rel="stylesheet" href="web/style.css">
+<style>
+  main { max-width: 760px; margin: 0 auto; padding: 12px 16px 40px; display: grid; gap: 12px; }
+  #say input { flex: 1; }
+</style>
+</head>
+<body>
+<main>
+  <div class="row"><h1 class="grow" id="title">DnD in mixed reality</h1><span class="tag" id="conn">connecting</span></div>
+
+  <section class="panel" id="setup">
+    <h2>Your hero</h2>
+    <div class="row"><input id="name" placeholder="Name" maxlength="24" class="grow"><button class="primary" id="save">Join the game</button></div>
+    <p class="dim">Pick a calling:</p>
+    <div class="cards" id="classes"></div>
+  </section>
+
+  <div class="banner hidden" id="turn">Your turn. Say what you do.</div>
+
+  <section class="panel" id="story">
+    <div class="row"><h2 class="grow" id="act">Waiting for the game to start</h2><span class="tag" id="mood"></span></div>
+    <div class="captions" id="captions"><div class="dim">The narrator's words appear here.</div></div>
+  </section>
+
+  <section class="panel" id="say">
+    <div class="row"><input id="words" placeholder="Say it out loud, then type it here (or the game master types it for you)" autocomplete="off"><button class="primary" id="send">Say</button></div>
+  </section>
+
+  <section class="panel" id="me">
+    <div class="row"><h2 class="grow" id="heroLine">-</h2><button class="small" id="edit">Change hero</button></div>
+    <div id="state" class="dim"></div>
+    <div id="things" style="margin-top:8px"></div>
+  </section>
+
+  <section class="panel">
+    <div class="row"><h2 class="grow">The floor</h2><span class="dim">tap where you stand</span></div>
+    <canvas class="map" id="map"></canvas>
+  </section>
+
+  <section class="panel">
+    <div class="row">
+      <label><input type="checkbox" id="voice"> Narrator's voice on this device</label>
+      <label><input type="checkbox" id="caps" checked> Captions</label>
+    </div>
+    <pre class="log" id="status"></pre>
+  </section>
+</main>
+<script src="/mumr/util.js"></script>
+<script src="/mumr/link.js"></script>
+<script src="/mumr/align.js"></script>
+<script src="/mumr/wire.js"></script>
+<script src="/mumr/session.js"></script>
+<script src="/mumr/life.js"></script>
+<script src="lib/rules.js"></script>
+<script src="lib/voice.js"></script>
+<script src="lib/game.js"></script>
+<script src="web/table.js"></script>
+<script src="web/speak.js"></script>
+<script src="web/player.js"></script>
+</body>
+</html>

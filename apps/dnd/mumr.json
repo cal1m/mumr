@@ -1,0 +1,6 @@
+{
+  "title": "DnD in mixed reality",
+  "index": "index.html",
+  "max_peers": 5,
+  "host": "host.js"
+}

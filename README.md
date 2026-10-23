@@ -39,6 +39,7 @@ client/xr/ session input ghost players3d panel3d   ES modules for WebXR, THREE h
 test/      Node tests (hubfake.js: a pretend server for several pretend headsets in one process)
 server/tests/   Python tests
 examples/  counter (no XR), cube (the XR demo, with a PC view)
+apps/      dnd (the DnD game: scenarios, a host that is the game master; no XR yet)
 docs/      ARCHITECTURE.md  HOWTO-NEW-APP.md  PLAN.md  NOTES.md (what was learnt, and what was streamlined)
 ```
 

@@ -1,0 +1,807 @@
+[
+ {
+  "id": "9c6b77dd",
+  "v": "narrator",
+  "t": "You stand in the testing hall of the Wayfarers' Lodge. Dust, old banners, and a brass lantern hanging from a hook."
+ },
+ {
+  "id": "cb385065",
+  "v": "pip",
+  "t": "Ah! Fresh faces. I am Pip, and I am the lantern. I will be your guide today."
+ },
+ {
+  "id": "02ba264d",
+  "v": "pip",
+  "t": "Here is the first rule. There is nothing to press. You speak out loud, to me or to each other, and the world listens."
+ },
+ {
+  "id": "4d8b52a1",
+  "v": "pip",
+  "t": "Go on, try it. Say hello to me."
+ },
+ {
+  "id": "5950ecd0",
+  "v": "pip",
+  "t": "Just say: hello, Pip. Loud and clear."
+ },
+ {
+  "id": "326b1f84",
+  "v": "pip",
+  "t": "Test one. That door at the end of the hall is stuck. Get it open."
+ },
+ {
+  "id": "1507ad76",
+  "v": "pip",
+  "t": "When you try something hard, the world rolls the dice for you. You will never hear the numbers. You will only hear what happens."
+ },
+ {
+  "id": "7c4354a5",
+  "v": "pip",
+  "t": "You could push the door. Or look around it for another way. You may also ask me questions."
+ },
+ {
+  "id": "6824f3da",
+  "v": "pip",
+  "t": "That is a fail. It happens. Try again, or try something else."
+ },
+ {
+  "id": "998a00df",
+  "v": "pip",
+  "t": "Questions are always allowed. The answers are true, and they never cost you anything. The door, by the way, has a latch somewhere."
+ },
+ {
+  "id": "12786a18",
+  "v": "narrator",
+  "t": "Beyond the door is a sandy yard. In the middle stands a dummy of straw and iron bands."
+ },
+ {
+  "id": "a7822c40",
+  "v": "narrator",
+  "t": "It turns its head toward you, with a creak."
+ },
+ {
+  "id": "c5f405f2",
+  "v": "pip",
+  "t": "Test two. A fight! When it is your turn, I will call your name. Say what you do: attack, defend, or help a friend."
+ },
+ {
+  "id": "4b0c8849",
+  "v": "pip",
+  "t": "Menders can heal, Wardens can guard a friend, Kindlers can ward everyone. Just say it."
+ },
+ {
+  "id": "74b32035",
+  "v": "narrator",
+  "t": "Everything goes dark. Then, a smell of oil and straw."
+ },
+ {
+  "id": "0e01074a",
+  "v": "pip",
+  "t": "Up you get. Everyone falls the first time. The dummy has gone back to its corner."
+ },
+ {
+  "id": "22371905",
+  "v": "pip",
+  "t": "Well done! Test three, the last one. On the bench there is a red potion, and a sealed letter."
+ },
+ {
+  "id": "b6e3f1f2",
+  "v": "pip",
+  "t": "You may keep one, and only one. Decide together. When someone says what you take, I will ask if all of you agree."
+ },
+ {
+  "id": "609e79c8",
+  "v": "pip",
+  "t": "The potion, or the letter? Somebody say it, and the others say yes or no."
+ },
+ {
+  "id": "d2d179e6",
+  "v": "pip",
+  "t": "The potion. Practical! You will be glad of it one day."
+ },
+ {
+  "id": "98c17e78",
+  "v": "pip",
+  "t": "You have passed the Lantern Test, all of you. The Lodge has work for people like you."
+ },
+ {
+  "id": "3c2940bc",
+  "v": "narrator",
+  "t": "The bell of the old chapel has stopped ringing. Come quickly. Something under the chapel is waking."
+ },
+ {
+  "id": "20eb8e4d",
+  "v": "pip",
+  "t": "Ah. That one is a real job. You have passed the Lantern Test, and it seems your first quest has found you."
+ },
+ {
+  "id": "7107276e",
+  "v": "narrator",
+  "t": "Straw flies everywhere."
+ },
+ {
+  "id": "99e37043",
+  "v": "narrator",
+  "t": "The Drillmaster creaks, and keeps coming."
+ },
+ {
+  "id": "a02336e2",
+  "v": "narrator",
+  "t": "The village of Hollowmere has not heard its bell since the last winter."
+ },
+ {
+  "id": "c736f0d1",
+  "v": "narrator",
+  "t": "Tonight it hired you, for a purse of silver and a hot meal, to climb to the ruined chapel and bring back the Ashen Bell."
+ },
+ {
+  "id": "3f09714a",
+  "v": "narrator",
+  "t": "The old ones say the bell keeps something asleep under the chapel. Nobody young believes them."
+ },
+ {
+  "id": "335e1c67",
+  "v": "narrator",
+  "t": "Now you stand in the nave. The roof is half gone; rain drips through it. The air smells of wet stone, and of smoke."
+ },
+ {
+  "id": "ba85cf38",
+  "v": "narrator",
+  "t": "A bell rope hangs from the tower, with nothing at its end."
+ },
+ {
+  "id": "062df8a9",
+  "v": "narrator",
+  "t": "Wet footprints cross the floor, toward the altar."
+ },
+ {
+  "id": "6baac968",
+  "v": "narrator",
+  "t": "On a pillar, someone has drawn a sign in chalk."
+ },
+ {
+  "id": "b0818893",
+  "v": "narrator",
+  "t": "Somewhere to your left, cold air breathes up from a stairway into the dark."
+ },
+ {
+  "id": "13e59970",
+  "v": "narrator",
+  "t": "The chapel is quiet. You could look at the rope, the footprints, or the chalk sign. There is a desk by the altar, and the stairs down."
+ },
+ {
+  "id": "dd9e30cb",
+  "v": "narrator",
+  "t": "If you call out, someone might answer."
+ },
+ {
+  "id": "9f08ad41",
+  "v": "narrator",
+  "t": "The rope still hangs there, cut clean."
+ },
+ {
+  "id": "01e4f9c0",
+  "v": "narrator",
+  "t": "The prints are drying already."
+ },
+ {
+  "id": "2e0eed06",
+  "v": "narrator",
+  "t": "Small feet, bare, running. A child, or a slight young man. They go to the altar, and then down the cellar stairs. None come back up."
+ },
+ {
+  "id": "9493045c",
+  "v": "narrator",
+  "t": "The circle and its line. It sleeps. Do not wake it."
+ },
+ {
+  "id": "724c86a2",
+  "v": "narrator",
+  "t": "On the desk lies the priest's diary, and next to it an unlit lantern."
+ },
+ {
+  "id": "b187fcee",
+  "v": "narrator",
+  "t": "The last page reads: Rang the Ashen Bell at dusk, as every day. Vhorr sleeps. Young Tam asked about it again. He thinks the bell is silver. I fear for that boy."
+ },
+ {
+  "id": "99d40d14",
+  "v": "narrator",
+  "t": "The diary says what it said: the bell keeps Vhorr asleep, and young Tam wanted it."
+ },
+ {
+  "id": "4086d9f9",
+  "v": "narrator",
+  "t": "The candles on the altar flicker, all at once. Between them stands an old woman, grey, and see-through as smoke."
+ },
+ {
+  "id": "94134bbc",
+  "v": "ghost",
+  "t": "I am Sister Wenna. I kept the bell for forty years. Why have you come to my chapel? Speak true."
+ },
+ {
+  "id": "32f6da49",
+  "v": "ghost",
+  "t": "Well? Why are you here?"
+ },
+ {
+  "id": "c8dbd8a7",
+  "v": "ghost",
+  "t": "The truth. Good. Then hear mine."
+ },
+ {
+  "id": "8ad0da50",
+  "v": "ghost",
+  "t": "A boy took the bell. Frightened, not wicked. He dropped it below, when the great one opened an eye."
+ },
+ {
+  "id": "9d128b5b",
+  "v": "ghost",
+  "t": "Take the lantern from my desk. Light it before you go down. In the dark, he hears everything."
+ },
+ {
+  "id": "751fbfe1",
+  "v": "narrator",
+  "t": "She is gone. The lantern on the desk is the only thing that does not flicker."
+ },
+ {
+  "id": "81040d97",
+  "v": "ghost",
+  "t": "Liar. The last one who lied to me went down those stairs too."
+ },
+ {
+  "id": "fa9530e5",
+  "v": "narrator",
+  "t": "Her face hardens, and she is gone. The cold stays a while after her."
+ },
+ {
+  "id": "75b5f0cb",
+  "v": "ghost",
+  "t": "Ask me nothing, until you tell me why you are here."
+ },
+ {
+  "id": "4e354f8f",
+  "v": "narrator",
+  "t": "The stairs end at an iron-bound door. It is ajar. From below comes warm air, and a sound like a forge bellows: in, and out, very slowly."
+ },
+ {
+  "id": "1b83c179",
+  "v": "narrator",
+  "t": "You could open the door and go down, or go back up into the chapel."
+ },
+ {
+  "id": "bdf0cb70",
+  "v": "narrator",
+  "t": "Lantern light spills into a long stone hall. Coins, thousands of them, lie in drifts against the walls."
+ },
+ {
+  "id": "b21729fe",
+  "v": "narrator",
+  "t": "And on the biggest drift sleeps a dragon. Red as a dying coal, as long as a hay cart. Its chest rises, and falls."
+ },
+ {
+  "id": "11c5b8af",
+  "v": "narrator",
+  "t": "This is Vhorr."
+ },
+ {
+  "id": "ff8336b4",
+  "v": "narrator",
+  "t": "You go down into the dark. Your boots find coins: they slide and clink."
+ },
+ {
+  "id": "4d303660",
+  "v": "narrator",
+  "t": "Something enormous breathes, right in front of you. A cold draught comes down the stairs behind you, and the door bangs shut."
+ },
+ {
+  "id": "5bedd3ae",
+  "v": "narrator",
+  "t": "The breathing goes on, slow and deep. Whatever it is, it is still asleep. Your eyes slowly find the shape: a dragon, red as a dying coal, curled on a hill of coins. Vhorr."
+ },
+ {
+  "id": "44f3bf32",
+  "v": "narrator",
+  "t": "The breathing stops."
+ },
+ {
+  "id": "d845fc07",
+  "v": "narrator",
+  "t": "Vhorr sleeps. You could search the hall, try to take something quietly, or speak to the dragon. Or leave."
+ },
+ {
+  "id": "3f49b386",
+  "v": "narrator",
+  "t": "The Ashen Bell lies on its side in the coins, grey and plain, a hand's reach from the dragon's foreclaw."
+ },
+ {
+  "id": "b0980fcc",
+  "v": "narrator",
+  "t": "Near the door, a small bag has been dropped. A boy's bag: inside, a healing draught."
+ },
+ {
+  "id": "b76ff189",
+  "v": "narrator",
+  "t": "The bell lies by the dragon's claw. Vhorr's nostrils flare as he breathes."
+ },
+ {
+  "id": "7a06a1cb",
+  "v": "narrator",
+  "t": "A coin slides. Then a hundred more, chiming. Vhorr's eye opens, a slit of orange fire."
+ },
+ {
+  "id": "f9a29959",
+  "v": "narrator",
+  "t": "The noise rings off the walls."
+ },
+ {
+  "id": "08830ea4",
+  "v": "narrator",
+  "t": "You have the bell. Vhorr has not moved. The door, and the stairs, are behind you."
+ },
+ {
+  "id": "ad823335",
+  "v": "narrator",
+  "t": "You could creep out with the bell, or wake the dragon after all."
+ },
+ {
+  "id": "cfb2c2c0",
+  "v": "narrator",
+  "t": "One by one you climb the stairs, over the coins, past the claw, the bell held close. Behind you, the breathing does not change."
+ },
+ {
+  "id": "e2620125",
+  "v": "narrator",
+  "t": "Someone's boot finds a coin, and it rings like a little bell. Behind you, an enormous weight shifts."
+ },
+ {
+  "id": "3ac82c7f",
+  "v": "vhorr",
+  "t": "Who dares to wake me? You. I can smell your nerve."
+ },
+ {
+  "id": "d7d33106",
+  "v": "vhorr",
+  "t": "Polite thieves. That is new."
+ },
+ {
+  "id": "69e2e244",
+  "v": "vhorr",
+  "t": "Little things, in my hall. Speak, before I decide what you are."
+ },
+ {
+  "id": "b1b90cfa",
+  "v": "vhorr",
+  "t": "Well? I am awake now. That is your doing."
+ },
+ {
+  "id": "3d185219",
+  "v": "narrator",
+  "t": "Vhorr waits. You could try to take the bell and run, you could bargain with him, or you could fight."
+ },
+ {
+  "id": "f11c1207",
+  "v": "vhorr",
+  "t": "No."
+ },
+ {
+  "id": "ccb4167c",
+  "v": "vhorr",
+  "t": "A boy. He smelled of fear and candle wax. He dropped it when I opened one eye. Then he ran, and I let him. He was too thin to eat."
+ },
+ {
+  "id": "2b914d4f",
+  "v": "vhorr",
+  "t": "The bell sings me to sleep, every dusk, for a hundred years. I did not ask for it. But I have come to like the dreams."
+ },
+ {
+  "id": "14d3b344",
+  "v": "vhorr",
+  "t": "A bargain. Hm. You want the bell, to put me back to sleep. And what do I get?"
+ },
+ {
+  "id": "09953b7d",
+  "v": "vhorr",
+  "t": "Give me something worth a hundred years. A memory. A name. A promise. I will know if it is cheap."
+ },
+ {
+  "id": "4f8e124d",
+  "v": "vhorr",
+  "t": "A memory, a name, or a promise. I am waiting."
+ },
+ {
+  "id": "74703145",
+  "v": "vhorr",
+  "t": "Yes. I will dream of that."
+ },
+ {
+  "id": "b4aea552",
+  "v": "vhorr",
+  "t": "Hm. A small memory, from a small life."
+ },
+ {
+  "id": "a89906e0",
+  "v": "vhorr",
+  "t": "A promise. Mortals break them like twigs. But the bell-keepers kept theirs for a hundred years."
+ },
+ {
+  "id": "ed7ac90e",
+  "v": "vhorr",
+  "t": "You offer coins. To me. In this hall."
+ },
+ {
+  "id": "cc9a9627",
+  "v": "narrator",
+  "t": "Vhorr laughs, and it is like a kiln door opening."
+ },
+ {
+  "id": "025b2fac",
+  "v": "vhorr",
+  "t": "Then let us see what you are made of."
+ },
+ {
+  "id": "2bf9a957",
+  "v": "vhorr",
+  "t": "Not yet enough. What else?"
+ },
+ {
+  "id": "069d3c4a",
+  "v": "vhorr",
+  "t": "Enough. Take it. Ring it at dusk, every dusk, and I will dream."
+ },
+ {
+  "id": "3270a997",
+  "v": "narrator",
+  "t": "Vhorr pushes the bell toward you with one claw, curls up on his coins, and closes his eyes."
+ },
+ {
+  "id": "3bc010b6",
+  "v": "vhorr",
+  "t": "Cheap things. All of them. No. I have slept long enough."
+ },
+ {
+  "id": "b378b68a",
+  "v": "narrator",
+  "t": "He takes the bell in his jaws, like a dog takes a bone."
+ },
+ {
+  "id": "ce3d2ded",
+  "v": "narrator",
+  "t": "Vhorr rises to his full height. Heat rolls off him like off a forge."
+ },
+ {
+  "id": "3755908d",
+  "v": "vhorr",
+  "t": "Now you want to talk. Good. So do I."
+ },
+ {
+  "id": "b763f00b",
+  "v": "narrator",
+  "t": "You wake on the chapel steps, in the rain, every bone aching. Somebody has carried you up here, carefully, the way a cat carries a kitten."
+ },
+ {
+  "id": "1f0e38d3",
+  "v": "narrator",
+  "t": "Above the chapel, against the clouds, great wings beat once, twice."
+ },
+ {
+  "id": "bf6a3ad4",
+  "v": "narrator",
+  "t": "Vhorr roars, and the coins jump. You run for the stairs with the bell, and the heat follows you up."
+ },
+ {
+  "id": "4a354690",
+  "v": "narrator",
+  "t": "You burst out of the chapel into the night rain, and the stairway behind you fills with smoke and fury. He does not follow into the open. Not yet."
+ },
+ {
+  "id": "d6e8bcbf",
+  "v": "narrator",
+  "t": "A claw catches the bell and tears it away. Vhorr fills the stairwell, and then the chapel wall simply is not there any more."
+ },
+ {
+  "id": "f02bcc57",
+  "v": "narrator",
+  "t": "At dusk the next day, the whole of Hollowmere climbs to the chapel. The rope is mended. The Ashen Bell is hung."
+ },
+ {
+  "id": "5498744e",
+  "v": "narrator",
+  "t": "Sister Wenna's chalk sign is on the pillar still. The village trusted you, and so they listen when you tell them how the bell must be rung."
+ },
+ {
+  "id": "97ed637f",
+  "v": "narrator",
+  "t": "It rings out over the valley, low and grey and sweet. Far below, Vhorr sighs, and dreams."
+ },
+ {
+  "id": "4753d74c",
+  "v": "narrator",
+  "t": "Young Tam rings it, the next evening, and every evening after."
+ },
+ {
+  "id": "e3bcc8cd",
+  "v": "narrator",
+  "t": "You bring the bell back to Hollowmere. But the village does not trust you, and it does not listen."
+ },
+ {
+  "id": "4f7e8cde",
+  "v": "narrator",
+  "t": "They hang the bell in the inn's yard, not in the chapel. They ring it at noon, not at dusk, to show it off."
+ },
+ {
+  "id": "01084da7",
+  "v": "narrator",
+  "t": "Three nights later the bells of the valley ring again: every bell, all at once, from the wrong direction."
+ },
+ {
+  "id": "700427d9",
+  "v": "narrator",
+  "t": "Vhorr is awake, and he is looking for whoever took his dreams."
+ },
+ {
+  "id": "f5277e3d",
+  "v": "narrator",
+  "t": "Vhorr falls among his coins, and the hall goes cold for the first time in a hundred years."
+ },
+ {
+  "id": "713728a2",
+  "v": "narrator",
+  "t": "You carry the Ashen Bell back to Hollowmere. There is no more need to ring it. The village throws a feast anyway."
+ },
+ {
+  "id": "88e782b2",
+  "v": "narrator",
+  "t": "Only Sister Wenna, if you could see her, would look sad."
+ },
+ {
+  "id": "147454bc",
+  "v": "narrator",
+  "t": "Vhorr bursts out of the hill into the night, the Ashen Bell in his claws, and climbs into the clouds."
+ },
+ {
+  "id": "e550899b",
+  "v": "narrator",
+  "t": "For a long time there is only rain. Then, very far to the north, a bell rings once, from somewhere high in the mountains."
+ },
+ {
+  "id": "b734b41f",
+  "v": "narrator",
+  "t": "Whatever happens next, it will not happen in Hollowmere."
+ },
+ {
+  "id": "24349baa",
+  "v": "vhorr",
+  "t": "Little sting. I have had worse from bees."
+ },
+ {
+  "id": "453c0bb9",
+  "v": "vhorr",
+  "t": "Enough! This hall is not worth my blood."
+ },
+ {
+  "id": "bea29853",
+  "v": "narrator",
+  "t": "The road to the north ends at the Greyford. The ford itself drowned years ago; now there is only a wide, slow river, and mist."
+ },
+ {
+  "id": "43620a5f",
+  "v": "narrator",
+  "t": "On the bank: an old toll box nailed to a post, a cart lying on its side in the reeds, and a wooden sign."
+ },
+ {
+  "id": "f0dddd37",
+  "v": "narrator",
+  "t": "Somewhere out in the mist, a pole knocks against wood. Someone is out there, on the water."
+ },
+ {
+  "id": "59d75fa4",
+  "v": "narrator",
+  "t": "You could read the sign, search the cart, call for the ferry, or try to wade across."
+ },
+ {
+  "id": "ac543b32",
+  "v": "narrator",
+  "t": "Carved deep, and old: Pay the ferryman what you will miss, not what you will spend. And beneath, newer, scratched with a knife: Do not lie to him."
+ },
+ {
+  "id": "4d698a27",
+  "v": "narrator",
+  "t": "What you will miss, not what you will spend. And: do not lie to him."
+ },
+ {
+  "id": "c0ac5549",
+  "v": "narrator",
+  "t": "The cart has nothing else to give."
+ },
+ {
+  "id": "4a010629",
+  "v": "narrator",
+  "t": "You step into the river. It is colder than anything you have felt, and it pulls."
+ },
+ {
+  "id": "8802b2bf",
+  "v": "narrator",
+  "t": "Waist-deep, then chest-deep, you push on. Then the water ahead of you rises up in a long, black, gleaming back."
+ },
+ {
+  "id": "8cf8a1ed",
+  "v": "narrator",
+  "t": "The river takes your feet and rolls you back to the bank, bruised and gasping."
+ },
+ {
+  "id": "eb0dab79",
+  "v": "narrator",
+  "t": "A flat boat slides out of the mist. The ferryman is tall and bent and green, as if he grew on a riverbank and walked off it."
+ },
+ {
+  "id": "dceb8e8c",
+  "v": "moss",
+  "t": "Old Moss, that is me. Crossing, is it? There is a toll. Something you will miss."
+ },
+ {
+  "id": "314011e4",
+  "v": "moss",
+  "t": "Something you will miss. Not coins. Coins are the river's already."
+ },
+ {
+  "id": "f066b546",
+  "v": "moss",
+  "t": "Coins! The bottom of my river is paved with coins. Try again."
+ },
+ {
+  "id": "55cf4503",
+  "v": "moss",
+  "t": "Oh. Oh, I know this one. A little girl lost it, the year the ford drowned. Someone will miss this. Yes."
+ },
+ {
+  "id": "a9655c0e",
+  "v": "moss",
+  "t": "I shall miss that, when it ends. That will do."
+ },
+ {
+  "id": "80f408f0",
+  "v": "moss",
+  "t": "Hm. My frogs sing better."
+ },
+ {
+  "id": "4ebae9e7",
+  "v": "moss",
+  "t": "A fighter without a blade. You will miss that, true. I will give it back on the far side, if you do not lie to me."
+ },
+ {
+  "id": "40e5605b",
+  "v": "moss",
+  "t": "A memory, given away. Yes, you will miss it a little. Good."
+ },
+ {
+  "id": "fe943c7f",
+  "v": "moss",
+  "t": "Did you, now."
+ },
+ {
+  "id": "c9c82d8e",
+  "v": "narrator",
+  "t": "Old Moss smiles, and says nothing else. Somewhere under the water, something long turns over."
+ },
+ {
+  "id": "1fd57f08",
+  "v": "moss",
+  "t": "Take it then."
+ },
+ {
+  "id": "ba537cd5",
+  "v": "narrator",
+  "t": "He steps off the boat onto the water, and the mist folds over him. The boat is yours. So is the river."
+ },
+ {
+  "id": "d1f2403b",
+  "v": "moss",
+  "t": "You do not understand tolls, do you. Fine. Get in. But the river will want its own."
+ },
+ {
+  "id": "71053bbd",
+  "v": "moss",
+  "t": "Toll paid. Step in, step in. Mind the middle; something sleeps there."
+ },
+ {
+  "id": "03a20df4",
+  "v": "narrator",
+  "t": "The boat slides into the mist. The bank behind you disappears. In the middle of the river, the water goes very still."
+ },
+ {
+  "id": "e4975f29",
+  "v": "narrator",
+  "t": "Something long and black rises beside the boat, and an eye the size of a plate looks at each of you, one by one."
+ },
+ {
+  "id": "f97f2055",
+  "v": "moss",
+  "t": "Hush, now. These paid. These did not lie."
+ },
+ {
+  "id": "6bf19a5a",
+  "v": "narrator",
+  "t": "Old Moss hums, low. The black shape sinks again, slowly, without a ripple."
+ },
+ {
+  "id": "7fe2ddcb",
+  "v": "narrator",
+  "t": "The water bursts. A serpent of black mud and river weed rises over the boat, and it goes straight for the one the river remembers."
+ },
+ {
+  "id": "6781fc59",
+  "v": "narrator",
+  "t": "You wake on the far bank, soaked and battered, in a heap like driftwood. The river has spat you out. It did not want you after all."
+ },
+ {
+  "id": "9f1fe484",
+  "v": "narrator",
+  "t": "The far bank is solid under your feet. The mist thins; the road north goes on."
+ },
+ {
+  "id": "3dede305",
+  "v": "moss",
+  "t": "Safe travels. Come back this way, and I will remember you."
+ },
+ {
+  "id": "b9ed0276",
+  "v": "moss",
+  "t": "And you. I will remember you too."
+ },
+ {
+  "id": "cb77849c",
+  "v": "narrator",
+  "t": "You paid the toll, and the river let you pass."
+ },
+ {
+  "id": "fb5adfea",
+  "v": "narrator",
+  "t": "You crossed. The river let you, in the end, but it took its toll in bruises."
+ },
+ {
+  "id": "fc04d9aa",
+  "v": "narrator",
+  "t": "The Coil hisses, and the river boils around it."
+ },
+ {
+  "id": "e6c3e51c",
+  "v": "narrator",
+  "t": "The Coil sinks back into the black water, trailing a dark cloud."
+ },
+ {
+  "id": "95d2f871",
+  "v": "narrator",
+  "t": "Steel and fire. The fight begins."
+ },
+ {
+  "id": "61f3cc7f",
+  "v": "narrator",
+  "t": "There is no more talking. Fight!"
+ },
+ {
+  "id": "1ef53040",
+  "v": "narrator",
+  "t": "The last of you falls. Darkness."
+ },
+ {
+  "id": "b0a49b12",
+  "v": "narrator",
+  "t": "Then not yet. What do you do instead?"
+ },
+ {
+  "id": "c84173bb",
+  "v": "narrator",
+  "t": "Nobody objects."
+ },
+ {
+  "id": "e8901e3c",
+  "v": "narrator",
+  "t": "Let us pause here a moment."
+ },
+ {
+  "id": "ba74619c",
+  "v": "narrator",
+  "t": "And so, the story goes on."
+ }
+]

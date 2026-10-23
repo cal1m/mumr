@@ -167,6 +167,17 @@ Rozhodnutí zadavatele (2026-10-22):
 - Žádná VR část, žádné zvuky, žádný host zatím neexistují.
 - Log serveru `mumr-server.log` v `examples/dnd/` je ignorovaný gitem.
 
+### Doplněno 2026-10-23: aplikace `apps/dnd`
+
+- Vznikla skutečná aplikace [apps/dnd](../apps/dnd/README.md) (ne příklad; `examples/dnd` zůstává). Hraje se **bez XR**: hráči na
+  telefonech nebo v prohlížeči, stránka vypravěče/game mastera na PC (`gm.html`), hlas vypravěče z reproduktoru PC.
+- Host (`host.js`) dělá vše náhodné a všechny výsledky (sekce 3): kostky, zkoušky, souboj na tahy, AI bytostí s pamětí (hrozba,
+  úcta, zášť), uložení kampaně do `saves/campaign.json`. Fáze 4 je tedy hotová bez prostorové části.
+- Scénáře jako strom uzlů s podmínkami (sekce 11, bod 5): `s00` tutoriál (20 min), `s01` Ember Hollow (celý, 4 konce), `s02`
+  Greyford (45 min). Formát v [apps/dnd/scenarios/README.md](../apps/dnd/scenarios/README.md); simulátor `tools/dnd-sim.js`.
+- Řeč: zatím ji píše game master nebo hráč (záměr se z textu bere stejně, jako se bude brát z rozpoznané řeči).
+- Zkušební hry: [trial_runs.md](trial_runs.md). Otázky: [follow_up_questions.md](follow_up_questions.md).
+
 ## 13. Další krok
 
 Po odpovědích na otázky v [sekci 11](#11-otevřené-otázky) se upraví sekce 4 až 8 a začne fáze 2 (předměty jako tělesa),

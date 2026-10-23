@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DnD: game master</title>
+<link rel="stylesheet" href="web/style.css">
+<style>
+  main { padding: 12px 16px 40px; display: grid; gap: 12px; grid-template-columns: minmax(300px, 1fr) minmax(300px, 1.1fr) minmax(300px, 1fr); align-items: start; }
+  @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+  .col { display: grid; gap: 12px; }
+  header { padding: 12px 16px 0; }
+  #choices button { display: block; width: 100%; text-align: left; margin: 4px 0; }
+  .vars td:last-child { cursor: pointer; color: var(--accent); }
+  #heard input { flex: 1; }
+</style>
+</head>
+<body>
+<header class="row">
+  <h1 class="grow">Game master</h1>
+  <span class="tag" id="conn">connecting</span>
+  <select id="scenario"></select>
+  <button class="primary" id="start">Start</button>
+  <button id="stop">Stop</button>
+  <button id="pause">Pause</button>
+  <label><input type="checkbox" id="voice" checked> Narrator's voice here</label>
+  <button id="hush">Hush</button>
+</header>
+<main>
+  <div class="col">
+    <section class="panel">
+      <h2 id="act">No scenario</h2>
+      <div class="dim" id="node"></div>
+      <div class="banner hidden" id="pending"></div>
+      <div class="row hidden" id="yesno" style="margin-top:6px"><button id="yes">Yes, all agree</button><button id="no">No</button></div>
+    </section>
+    <section class="panel" id="heard">
+      <h2>They said</h2>
+      <div class="row"><select id="who"></select><input id="words" placeholder="what the player said (Enter)" autocomplete="off"></div>
+      <p class="dim" style="margin:6px 0 0">Type it as they said it; the host matches it to the story the same way it will match speech.</p>
+    </section>
+    <section class="panel">
+      <div class="row"><h2 class="grow">Choices open now</h2><button class="small" id="hint">Hint</button><button class="small" id="next">Skip turn</button></div>
+      <div id="choices" class="dim">-</div>
+      <div class="row" style="margin-top:8px"><select id="goto" class="grow"></select><button class="small" id="go">Go to node</button></div>
+    </section>
+    <section class="panel">
+      <h2>Narrate</h2>
+      <div class="row"><select id="sayVoice"><option>narrator</option><option>vhorr</option><option>pip</option><option>ghost</option><option>moss</option></select><input id="sayText" class="grow" placeholder="your own line (Enter)"></div>
+    </section>
+  </div>
+  <div class="col">
+    <section class="panel"><canvas class="map" id="map"></canvas><p class="dim" style="margin:6px 0 0">Click a hero in the table, then the floor, to move them.</p></section>
+    <section class="panel"><h2>Narrator</h2><div class="captions log" id="said"></div></section>
+    <section class="panel"><h2>Heard</h2><div class="log" id="heardLog"></div></section>
+  </div>
+  <div class="col">
+    <section class="panel"><h2>Heroes</h2><table id="heroes"></table></section>
+    <section class="panel"><h2>Creatures</h2><table id="creatures"></table><div class="row" style="margin-top:6px"><button class="small" id="amnesia">Make them forget everybody</button></div></section>
+    <section class="panel"><h2>Fight</h2><div id="combat" class="dim">no fight</div></section>
+    <section class="panel"><h2>Variables</h2><table class="vars" id="vars"></table></section>
+    <section class="panel"><h2>Dice</h2><div class="log" id="rolls"></div></section>
+    <section class="panel"><h2>Notes</h2><div class="log" id="notes"></div>
+      <div class="row" style="margin-top:6px"><button class="small" id="newcamp">New campaign</button><span class="dim" id="hist"></span></div></section>
+  </div>
+</main>
+<script src="/mumr/util.js"></script>
+<script src="/mumr/link.js"></script>
+<script src="/mumr/align.js"></script>
+<script src="/mumr/wire.js"></script>
+<script src="/mumr/session.js"></script>
+<script src="/mumr/worldfeed.js"></script>
+<script src="/mumr/life.js"></script>
+<script src="lib/rules.js"></script>
+<script src="lib/voice.js"></script>
+<script src="lib/game.js"></script>
+<script src="web/table.js"></script>
+<script src="web/speak.js"></script>
+<script src="web/gm.js"></script>
+</body>
+</html>
