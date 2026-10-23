@@ -125,7 +125,7 @@
         seen.add(s.id);
         const prev = this.state.get(s.id), was = prev ? prev.kind : null;
         const d = tipD(s), mean = d ? d.reduce((a, v) => a + v, 0) / 4 : Infinity, fw = this.fist.get(s.id) || false;
-        const fistOn = this.opts.fist && !!d && (fw ? mean < FIST_OFF : mean < FIST_ON && Math.max(...d) < FIST_MAX);
+        const fistOn = this.opts.fist && (s.fist === true || (!!d && (fw ? mean < FIST_OFF : mean < FIST_ON && Math.max(...d) < FIST_MAX)));      // (s.fist: the desktop's Ctrl)
         this.fist.set(s.id, fistOn);
         const pinchOn = this.opts.pinch && !!s.pinch;
         const kind = was === 'fist' && fistOn ? 'fist' : was === 'pinch' && pinchOn ? 'pinch' : fistOn ? 'fist' : pinchOn ? 'pinch' : null;

@@ -120,13 +120,13 @@
     }
     // one step of dt seconds at time t (s) with every hand there is (this page's and the others', floor plan)
     step(dt, t, sources) {
-      const C = this.cfg, grips = this.grips.update(sources);
+      const C = this.cfg, grips = this.grips.update(sources), noHold = new Set((sources || []).filter((s) => s.noHold).map((s) => s.id));
       this.touched = false;
       // holding: a grip of the engine (client/grab.js) that starts at the cube: a pinch within C.grab of it, a fist within C.grabFist.
       // It holds while that grip lasts (Marek: "nothing clever").
       for (const g of grips) {
         if (this.held && this.held.by === g.id && g.kind !== this.held.kind) this.held = null;
-        if (!this.held && g.start && g.at && this.dist(g.at[0], g.at[1], g.at[2]) <= (g.kind === 'fist' ? C.grabFist : C.grab)) {
+        if (!this.held && g.start && g.at && !noHold.has(g.id) && this.dist(g.at[0], g.at[1], g.at[2]) <= (g.kind === 'fist' ? C.grabFist : C.grab)) {      // (noHold: that fist moves a menu or the model)
           this.held = { by: g.id, kind: g.kind, off: [this.x - g.at[0], this.y - g.at[1], this.z - g.at[2]] };
         }
       }

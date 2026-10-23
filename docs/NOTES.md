@@ -146,6 +146,13 @@ Each item: what is there now in Nudgy, why it costs, what MUMR does instead. **D
     at its middle, scales it (0.3 to 4 times; the scale goes in the owner's menus info). A cube moved in a model is now held by that
     hand like a held cube (cube.steer: the same spring; the moving page takes the token; white edges for everybody), and falls when
     let go, also when the hand is lost.
+34. **The fist moves things** (Marek, 2026-10-23: "by default, grabbing anything anywhere with a full fist moves the whole thing").
+    createApp: a fist that starts inside this player's room model, on its menu or on the viewer carries that whole thing (the viewer
+    along the walls); that hand is marked noHold meanwhile, so the cube (or any app body that honours noHold) does not take it too. The
+    cube itself already took a fist. Desktop: Ctrl is a fist. The hand window's hands: a 2D drawing was "turbo stupid"; he chose solid,
+    lit tube hands (ghost.js `{ full, solid }`), life-size in front of the window, redrawn every frame. The enlarged hand IRL was thin
+    and pointy in a small model: its finger thickness was capped at 12 cm while its length grew; it is now the whole hand with every
+    joint's radius grown as much as the hand (tested: finger length to thickness 7.3 at 1x and at 40x).
 
 ## 3. Things that must not be lost (from the Nudgy build)
 

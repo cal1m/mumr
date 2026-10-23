@@ -81,3 +81,15 @@ test('the cube: one pointing finger pushes it; put on a flat hand it is carried,
   for (let k = 0; k < 60; k++) cube.step(0.016, t += 0.016, [side]);
   assert.strictEqual(cube.onHand, null); assert.ok(cube.z < 0.3, `fell: ${cube.z}`);
 });
+
+test('a fist that moves something else (marked noHold) does not take the cube; the same fist without the mark does', () => {
+  const run = (mark) => {
+    const cube = new C.Cube();
+    cube.place(0, 0);
+    const palm = [C.HALF + 0.05, 0, C.HALF], h = (curled) => Object.assign(hand('left', palm, { curled }), mark ? { noHold: true } : {});      // (a left hand: its thumb points away from the cube)
+    cube.step(0.016, 0.016, [h([])]); cube.step(0.016, 0.032, [h(ALL)]);
+    return cube.held && cube.held.kind;
+  };
+  assert.strictEqual(run(true), null, 'noHold: not taken');
+  assert.strictEqual(run(false), 'fist');
+});

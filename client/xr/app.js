@@ -3,7 +3,7 @@
 // player's own and the fingertip press), presence, the ghost fingers, the hand cutouts, the feet (if asked), everybody's gestures
 // (grab.js), the other players, the anchor keeper; entering and
 // leaving mixed reality; the desktop rehearsal (?name=A&frame=x,y,deg: a pretend line-up, the mouse as a fingertip, Shift a pinch, a click
-// on any menu presses it, ?room=demo a pretend room scan); the room (room.js: the server's, uploaded by a headset; drawn as outlines on the
+// on any menu presses it, Ctrl a fist, ?room=demo a pretend room scan); the fist as the move gesture for whatever can be moved; the room (room.js: the server's, uploaded by a headset; drawn as outlines on the
 // desktop and while lining up); giving bodies up while nobody looks at the page; the status line and reloading on a new build.
 //
 //   const app = await createApp({ THREE, OrbitControls,
@@ -35,7 +35,7 @@
 // The page needs the elements #view (canvas), #enter, #xrNote, #say, #status.
 import { enterXR } from './session.js';
 import { readInput, readFeet, readPlanes } from './input.js';
-import { makeGhost, GHOST_COLOURS } from './ghost.js';
+import { makeGhost, GHOST_COLOURS, RADII } from './ghost.js';
 import { createPlayers, PLAYER_COLOURS } from './players3d.js';
 import { makePanels } from './panel3d.js';
 import { createRoom3d } from './room3d.js';
@@ -183,9 +183,9 @@ export async function createApp(o) {
       if (id) pressed(q.owner, id, [...panelsAll].find(([, v]) => v === q)[0]);
       return;
     }
-    if (ray.ray.intersectPlane(floorPlane, hitP)) { mouse = { x: hitP.x, y: -hitP.z, pinch: ev.shiftKey }; canvas.setPointerCapture(ev.pointerId); }
+    if (ray.ray.intersectPlane(floorPlane, hitP)) { mouse = { x: hitP.x, y: -hitP.z, pinch: ev.shiftKey, fist: ev.ctrlKey }; canvas.setPointerCapture(ev.pointerId); }
   });
-  canvas.addEventListener('pointermove', (ev) => { if (!mouse) return; pointer(ev); if (ray.ray.intersectPlane(floorPlane, hitP)) mouse = { x: hitP.x, y: -hitP.z, pinch: ev.shiftKey }; });
+  canvas.addEventListener('pointermove', (ev) => { if (!mouse) return; pointer(ev); if (ray.ray.intersectPlane(floorPlane, hitP)) mouse = { x: hitP.x, y: -hitP.z, pinch: ev.shiftKey, fist: ev.ctrlKey }; });
   canvas.addEventListener('pointerup', () => { mouse = null; });
   canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
   let pressedLook = { key: null, id: null, t: -1e9 };
@@ -230,11 +230,12 @@ export async function createApp(o) {
       const scan = readPlanes(xr, frame, space, planeState);
       if (scan !== undefined) room.setScan(scan);
     } else if (mouse) {
-      own = [{ id: 'mouse', pinch: !!mouse.pinch, points: [{ name: 'index', x: mouse.x, y: mouse.y, z: 0.05 }, { name: 'thumb', x: mouse.x, y: mouse.y, z: 0.05 }] }];
+      own = [{ id: 'mouse', pinch: !!mouse.pinch, fist: !!mouse.fist, points: [{ name: 'index', x: mouse.x, y: mouse.y, z: 0.05 }, { name: 'thumb', x: mouse.x, y: mouse.y, z: 0.05 }] }];
     }
     // everybody's hands and what they are doing (grab.js): for the ghost fingers' colours, the hand wall and the app
     app.everyone = presence.hands(own, now);
     app.gestures = grips.update(app.everyone);
+    fistMoves(own);
     const ghost = S.stateOf(null).ghost !== false;
     for (const id of ['left', 'right']) {
       const h = handsXR.find((q) => q.id === id && q.jp), g = ghosts[id];
@@ -267,6 +268,50 @@ export async function createApp(o) {
     renderer.render(scene, camera);
     if (now - statusAt > 300) status(now);
   }
+  // ---- the fist moves things (Marek, 2026-10-23: by default a full fist anywhere on something that can be moved moves the whole of
+  // it): this player's room model, its menu, the viewer (along the walls). A hand whose fist took one of them holds nothing else: its
+  // source is marked noHold (which the other players get too), so the app's bodies do not take it as well. (The app's own bodies take a
+  // fist by their own rules: the cube does.)
+  const fists = new Map();       // hand id -> { what: 'model' | 'menu' | 'viewer', off }
+  let lastMenuH = 0.3, lastHandsXR = [];
+  // whether p (floor plan) is on a panel of w x h metres at pose (menus.axes), or a little in front of or behind it
+  function onPanel(pose, w, h, p) {
+    const A = M.menus.axes(pose), q = [p[0] - A.pos[0], p[2] + space.floorY - A.pos[1], -p[1] - A.pos[2]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    return Math.abs(dot(q, A.right)) <= w / 2 + 0.04 && Math.abs(dot(q, A.up)) <= h / 2 + 0.04 && Math.abs(dot(q, A.normal)) <= 0.12;
+  }
+  function putViewer(s) {
+    const c = space.ok ? space.toCommon([s.x, s.y, s.h]) : [s.x, s.y, s.h], yaw = space.ok ? space.yawToCommon(s.yaw) : s.yaw;
+    S.emit({ k: 'wallspot', x: +c[0].toFixed(3), y: +c[1].toFixed(3), h: +c[2].toFixed(3), yaw: +yaw.toFixed(4) });
+    life(`viewer moved to (${s.x.toFixed(2)}, ${s.y.toFixed(2)}), ${s.h.toFixed(2)} m up`);
+  }
+  function fistMoves(own) {
+    for (const g of app.gestures) {
+      if (!own.some((s) => s.id === g.id)) continue;                    // (this page's own hands)
+      const f = fists.get(g.id);
+      if (f && g.kind !== 'fist') {                                     // let go: it stays where it is
+        if (f.what === 'viewer' && viewerPreview) { putViewer(viewerPreview); viewerPreview = null; }
+        fists.delete(g.id); life(`fist: let go of the ${f.what}`);
+        continue;
+      }
+      const p = g.at;
+      if (f && p) {
+        const x = p[0] + f.off[0], y = p[1] + f.off[1], z = p[2] + f.off[2];
+        if (f.what === 'model' && modelPose) { modelPose = Object.assign({}, modelPose, { x, y, z }); modelHot = 'move'; }
+        else if (f.what === 'menu') follower.place(x, y, z + space.floorY, { x: head[0], y: head[1], th: head[2], py: head[3] + space.floorY });
+        else if (f.what === 'viewer') { const s = wallSpot(room.local(), [x, y, z]); if (s) viewerPreview = s; }
+        continue;
+      }
+      if (g.kind !== 'fist' || !g.start || !p) continue;
+      const r = room.local(), F = RM && r && modelPose ? M.model.frameOf(r) : null, vs = handWall && handWall.spot;
+      let took = null;
+      if (F && M.model.inside(modelPose, F, p, 0.03)) took = { what: 'model', off: [modelPose.x - p[0], modelPose.y - p[1], modelPose.z - p[2]] };
+      else if (follower.pose && onPanel(follower.pose, MENU_W, lastMenuH, p)) { const P = follower.pose; took = { what: 'menu', off: [P.x - p[0], P.y - p[1], P.h - space.floorY - p[2]] }; }
+      else if (vs && onPanel({ x: vs.x, y: vs.y, h: vs.h + space.floorY, yaw: vs.yaw, pitch: 0 }, WALL_SIZE.w, WALL_SIZE.h, p)) took = { what: 'viewer', off: [vs.x - p[0], vs.y - p[1], vs.h - p[2]] };
+      if (took) { fists.set(g.id, took); life(`fist: took the ${took.what}`); }
+    }
+    for (const id of [...fists.keys()]) if (!own.some((s) => s.id === id)) { const f = fists.get(id); if (f.what === 'viewer' && viewerPreview) { putViewer(viewerPreview); viewerPreview = null; } fists.delete(id); }
+    for (const s of own) if (fists.has(s.id)) s.noHold = true;
+  }
   // ---- the viewer's place: the document's wallspot (common frame) in this page's floor plan, or null (the default: the longest wall)
   let viewerPreview = null;
   function viewerSpot() {
@@ -290,10 +335,7 @@ export async function createApp(o) {
         const s = wallSpot(room.local(), at);                           // (the viewer only goes onto a wall: the nearest one to the hand)
         if (!s) return;
         viewerPreview = phase === 'drop' ? null : s;
-        if (phase !== 'drop') return;
-        const c = space.ok ? space.toCommon([s.x, s.y, s.h]) : [s.x, s.y, s.h], yaw = space.ok ? space.yawToCommon(s.yaw) : s.yaw;
-        S.emit({ k: 'wallspot', x: +c[0].toFixed(3), y: +c[1].toFixed(3), h: +c[2].toFixed(3), yaw: +yaw.toFixed(4) });
-        life(`viewer moved to (${s.x.toFixed(2)}, ${s.y.toFixed(2)}), ${s.h.toFixed(2)} m up`);
+        if (phase === 'drop') putViewer(s);
       } };
   }
   function modelFrame(now, own) {
@@ -339,8 +381,10 @@ export async function createApp(o) {
         if (!s.joints || s.foot) continue;
         const tip = s.joints[9], palm = s.joints[10];
         if (!M.model.inside(m.pose, F, tip, 0.03) && !M.model.inside(m.pose, F, palm, 0.03)) continue;
-        if (!bigHands[n]) { bigHands[n] = new GhostHand(0.35); scene.add(bigHands[n].mesh); }
-        const jp = new Float32Array(75), jr = new Float32Array(25).fill(Math.min(0.12, 0.009 / M.model.scaleOf(m.pose, F)));
+        if (!bigHands[n]) { bigHands[n] = new GhostHand(0.35, { full: true }); scene.add(bigHands[n].mesh); }
+        // (the whole hand, as thick as it is long: its own joints' radii if this page tracks it, typical ones if not, all grown as much)
+        const S2 = M.model.scaleOf(m.pose, F), hx = m.mine ? (lastHandsXR.find((q) => q.id === s.id && q.jr) || null) : null;
+        const jp = new Float32Array(75), jr = new Float32Array(25).map((_, i) => (hx ? hx.jr[i] : RADII[i]) / S2);
         s.joints.forEach((q, i) => { const p = M.model.fromModel(m.pose, F, q); jp[i * 3] = p[0]; jp[i * 3 + 1] = p[2] + space.floorY; jp[i * 3 + 2] = -p[1]; });
         bigHands[n].update(jp, jr, m.mine ? 0xf2c14e : PLAYER_COLOURS[m.slot % PLAYER_COLOURS.length]);
         n++;
@@ -370,6 +414,7 @@ export async function createApp(o) {
       want.add(key);
     }
     for (const pn of list) pn.h = pn.w * pn.lay.h / pn.lay.w;
+    lastMenuH = list[0].h; lastHandsXR = handsXR;
     let hover = null;
     if (tips.length) {
       const r = poke.update(list, tips, now);
@@ -390,6 +435,7 @@ export async function createApp(o) {
       if (!h || !h.pinch) drag = null;
       else { follower.place(h.at[0] + drag.off[0], -h.at[2] + drag.off[2], h.at[1] + drag.off[1], at); handle = 'held'; busyKeys.add('own:main'); }
     }
+    if ([...fists.values()].some((f) => f.what === 'menu')) { handle = 'held'; busyKeys.add('own:main'); }      // (carried by a fist)
     if (xr) follower.update(at, dt, busyKeys.has('own:main'));
     list[0].pose = follower.pose;
     menus.send(now, [{ id: 'main', pose: follower.pose }].concat(wristPose ? [{ id: 'wrist', pose: wristPose }] : [],
@@ -431,6 +477,6 @@ export async function createApp(o) {
   renderer.setAnimationLoop(onFrame);
   // a page of another build reloads itself (outside mixed reality): a headset never runs an old page by accident
   setInterval(async () => { if (xr) return; try { const i = await (await fetch('/info')).json(); if (i.build && info.build && i.build !== info.build) location.reload(); } catch (e) { /* the server is away */ } }, 3000);
-  window.__mumr = Object.assign(app, { link, panels: panelsAll, controls, frame: () => onFrame(performance.now(), null), press: pressed, poke: (x, y, pinchOn) => { mouse = x === undefined ? null : { x, y, pinch: !!pinchOn }; } });
+  window.__mumr = Object.assign(app, { link, panels: panelsAll, controls, frame: () => onFrame(performance.now(), null), press: pressed, poke: (x, y, pinchOn, fistOn) => { mouse = x === undefined ? null : { x, y, pinch: !!pinchOn, fist: !!fistOn }; } });
   return app;
 }
