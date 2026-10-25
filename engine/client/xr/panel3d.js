@@ -30,7 +30,7 @@ export function drawGrid(ctx, lay, look = {}) {
     const text = !b.id, hov = look.hover === b.id && !b.off && !text, prs = look.pressed === b.id;
     if (b.ghost) {                                       // (a button drawn as a frame only: what is under it shows)
       g.lineWidth = b.active ? 6 : 3; g.strokeStyle = b.active ? COL.hover : COL.dim; round(g, b.x, b.y, b.w, b.h, r); g.stroke();
-    } else {
+    } else if (!b.flat) {
       g.fillStyle = text ? COL.cell : b.off ? COL.off : b.active ? COL.btnOn : COL.btn;
       round(g, b.x, b.y, b.w, b.h, r); g.fill();
     }
@@ -40,6 +40,9 @@ export function drawGrid(ctx, lay, look = {}) {
     if (b.value !== undefined && b.value !== '') {
       g.font = '600 26px system-ui, sans-serif'; g.fillText(fit(g, b.label, b.w - 16), cx, b.y + b.h * 0.36);
       g.fillStyle = b.off ? COL.dim : b.active ? '#ffffff' : COL.dim; g.font = '22px system-ui, sans-serif'; g.fillText(fit(g, String(b.value), b.w - 16), cx, b.y + b.h * 0.7);
+    } else if (b.left) {                                 // a line of text (a window's): left aligned, `size` px, `head` in the accent colour
+      g.font = `${b.head ? 600 : 400} ${b.size || 24}px system-ui, sans-serif`; g.textAlign = 'left'; if (b.head) g.fillStyle = COL.hover;
+      g.fillText(fit(g, b.label || '', b.w - 32), b.x + 16, b.y + b.h / 2);
     } else { g.font = '600 28px system-ui, sans-serif'; g.fillText(fit(g, b.label || '', b.w - 16), cx, b.y + b.h / 2); }
   }
   if (look.edge !== undefined && look.edge !== null) { g.lineWidth = 10; g.strokeStyle = hex(look.edge); round(g, 5, 5, W - 10, H - 10, 20); g.stroke(); }

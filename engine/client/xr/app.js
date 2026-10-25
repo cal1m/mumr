@@ -28,6 +28,12 @@
 //                                                        is shown full size in the room when it reaches into it; things: the app's
 //                                                        movable things [{ id, label, kind: 'box', at, yaw, size: [w], colour,
 //                                                        drag(phase, at, preview) }] (the viewer is the engine's)
+//     windows: [{ id, w, bearing, dist, desktop, lay(app, now) }],   (optional) text windows for this player only (not sent): each hangs
+//                                                        on a wall like the viewer, beside it, and is moved along the walls by its bar
+//                                                        (pinch) or a fist; with no wall (no room scan) it floats and follows like the menu
+//                                                        (bearing, dist: where it first appears, rad from ahead + is left, 0.8 m; desktop: its
+//                                                        pose without a room). Drawn from lay(): a menus.grid layout, redrawn four times a
+//                                                        second (a cell with `left: true` is a line of text: `head`, `size`, `flat`). w: metres wide (0.5)
 //     anchorKey, name })                                 (optional) where the anchor is kept; who this page is in the log
 //   app: { THREE, scene, world, camera, S, space, presence, menus, lineup, sys, room, grips, handMask, feet, life, say, head(), xr(), bodies,
 //          ownerText(slot), gestures (this frame: everybody's hands' grab.js states), everyone (this frame: everybody's hand sources) }
@@ -117,6 +123,8 @@ export async function createApp(o) {
   });
   const bodies = (typeof o.bodies === 'function' ? o.bodies({ S, space, say, life }) : o.bodies || []).map((b) => new M.body.Body(S, b));
   const pinch = new M.hands.Pinch(), poke = new M.menus.Poke(), follower = new M.follow.Follower(), grips = new M.grab.Grips();
+  const wins = (o.windows || []).map((d, i) => ({ d, id: d.id, w: d.w || 0.5, h: 0.3, f: new M.follow.Follower({ dist: d.dist || 0.8, bearing: d.bearing === undefined ? 0.5 : d.bearing }),
+    panel: null, lay: null, layAt: -1e9, redraw: false, pinch: new Map(), drag: null, order: i }));
   const isHost = (slot) => { const p = S.peers.get(slot); return slot === HOST || !!(p && p.host); };
   const ownerText = (slot) => (slot === null || slot === undefined ? 'nobody' : isHost(slot) ? 'host' : slot === S.me ? 'you' : `player ${slot + 1}`);
   link.onBin = (b) => {
@@ -272,6 +280,7 @@ export async function createApp(o) {
     if (o.step) o.step(dt, now / 1000, all, own);
     for (const b of bodies) b.send(now);
     menusFrame(now, dt, head, handsXR, tips);
+    windowsFrame(now, dt, head, handsXR);
     modelFrame(now, own);
     players.update(presence.others(now).map((q) => ({ slot: q.slot, head: q.head, sources: q.sources })), dt);
     players.marks(lineup.marks());
@@ -314,6 +323,7 @@ export async function createApp(o) {
         const x = p[0] + f.off[0], y = p[1] + f.off[1], z = p[2] + f.off[2];
         if (f.what === 'model' && modelPose) { modelPose = Object.assign({}, modelPose, { x, y, z }); modelHot = 'move'; }
         else if (f.what === 'menu') follower.place(x, y, z + space.floorY, { x: head[0], y: head[1], th: head[2], py: head[3] + space.floorY });
+        else if (f.what.startsWith('win:')) { const w = wins.find((q) => `win:${q.id}` === f.what); if (w) moveWin(w, x, y, z); }
         else if (f.what === 'viewer') { const s = wallSpot(room.local(), [x, y, z]); if (s) viewerPreview = s; }
         continue;
       }
@@ -322,6 +332,7 @@ export async function createApp(o) {
       let took = null;
       if (F && M.model.inside(modelPose, F, p, 0.03)) took = { what: 'model', off: [modelPose.x - p[0], modelPose.y - p[1], modelPose.z - p[2]] };
       else if (follower.pose && onPanel(follower.pose, MENU_W, lastMenuH, p)) { const P = follower.pose; took = { what: 'menu', off: [P.x - p[0], P.y - p[1], P.h - space.floorY - p[2]] }; }
+      else if (wins.some((w) => winPose(w) && onPanel(winPose(w), w.w, w.h, p))) { const w = wins.find((q) => winPose(q) && onPanel(winPose(q), q.w, q.h, p)), P = winPose(w); took = { what: `win:${w.id}`, off: [P.x - p[0], P.y - p[1], P.h - space.floorY - p[2]] }; }
       else if (vs && onPanel({ x: vs.x, y: vs.y, h: vs.h + space.floorY, yaw: vs.yaw, pitch: 0 }, WALL_SIZE.w, WALL_SIZE.h, p)) took = { what: 'viewer', off: [vs.x - p[0], vs.y - p[1], vs.h - p[2]] };
       if (took) { fists.set(g.id, took); life(`fist: took the ${took.what}`); }
     }
@@ -354,6 +365,17 @@ export async function createApp(o) {
         if (phase === 'drop') putViewer(s);
       } };
   }
+  // the text windows (o.windows) are things in the room model too, moved like the viewer: only along the walls, the ghost shows where
+  // one will go, and the place is taken when it is let go
+  function winThings() {
+    return wins.filter((w) => w.spot && hasWall()).map((w) => ({ id: `win:${w.id}`, label: w.d.title || w.id, kind: 'panel', at: [w.spot.x, w.spot.y, w.spot.h], yaw: w.spot.yaw, size: [w.w, w.h], colour: 0xf2c14e,
+      preview: w.preview ? [w.preview.x, w.preview.y, w.preview.h] : undefined,
+      drag(phase, at) {
+        const s = M.room.wallSpot(room.local(), { w: w.w, h: w.h }, at);
+        if (!s) return;
+        if (phase === 'drop') { w.spot = s; w.preview = null; life(`window ${w.id} moved to (${s.x.toFixed(2)}, ${s.y.toFixed(2)}), ${s.h.toFixed(2)} m up`); } else w.preview = s;
+      } }));
+  }
   function modelFrame(now, own) {
     const r = room.local(), F = RM && r ? M.model.frameOf(r) : null, models = [];
     if (F && RM.open(S.stateOf(null))) {
@@ -367,7 +389,7 @@ export async function createApp(o) {
       const p = q.panels.find((x) => x.id === 'model');
       if (p) models.push({ key: `p${q.slot}`, slot: q.slot, mine: false, pose: { x: p.pose.x, y: p.pose.y, z: p.pose.h - space.floorY, yaw: p.pose.yaw, k: q.info && q.info.model ? +q.info.model.k || 1 : 1 } });
     }
-    const things = F ? (RM.things ? RM.things(app) : []).concat([viewerThing()].filter(Boolean)) : [];
+    const things = F ? (RM.things ? RM.things(app) : []).concat([viewerThing()].filter(Boolean), winThings()) : [];
     for (const m of models) { m.F = F; m.things = things; }
     // the hands: this page's own reach into any model
     for (const ev of modelHands.update(lineup.active ? [] : own, models)) {
@@ -473,6 +495,53 @@ export async function createApp(o) {
       }
     }
     for (const [key, q] of [...panelsAll]) if (!want.has(key)) { q.panel.dispose(); panelsAll.delete(key); }
+  }
+  // the text windows (o.windows): this player's own. They hang on a wall like the viewer, and are moved along the walls by the bar under
+  // them (pinch) or a fist; with no wall to hang on (no room scan) they float and follow like the menu.
+  const hasWall = () => { const r = room.local(); return !!r && M.room.walls(r).length > 0; };
+  function winPose(w) {
+    if (w.spot && hasWall()) return { x: w.spot.x, y: w.spot.y, h: w.spot.h + space.floorY, yaw: w.spot.yaw, pitch: 0 };
+    return w.f.pose;
+  }
+  // (x, y, z) is where a hand wants the window (floor plan, z above the floor): on a wall, the nearest place on a wall
+  function moveWin(w, x, y, z) {
+    if (hasWall()) { const s = M.room.wallSpot(room.local(), { w: w.w, h: w.h }, [x, y, z]); if (s) w.spot = s; return; }
+    w.f.place(x, y, z + space.floorY, { x: head[0], y: head[1], th: head[2], py: head[3] + space.floorY });
+  }
+  // the first place on a wall: next to the viewer's default place, the windows one after another to the right and left of it
+  function firstSpot(w) {
+    const r = room.local(), base = M.room.wallSpot(r, { w: w.w, h: w.h });
+    if (!base) return null;
+    const side = w.order % 2 === 0 ? 1 : -1, k = Math.floor(w.order / 2) + 1, tx = -Math.sin(base.yaw), ty = Math.cos(base.yaw), d = side * k * (WALL_SIZE.w / 2 + w.w / 2 + 0.1);
+    return M.room.wallSpot(r, { w: w.w, h: w.h }, [base.x + tx * d, base.y + ty * d, base.h]);
+  }
+  function windowsFrame(now, dt, hd, handsXR) {
+    const at = { x: hd[0], y: hd[1], th: hd[2], py: hd[3] + space.floorY };
+    for (const w of wins) {
+      if (!w.f.pose) { if (xr) w.f.snap(at); else w.f.set(w.d.desktop || { x: -0.4 + 0.5 * w.order, y: 0.4, h: 1.15, yaw: -1.3, pitch: 0.15 }); }
+      if (!w.lay || now - w.layAt > 250) { w.lay = w.d.lay(app, now); w.layAt = now; w.redraw = true; }
+      w.h = w.w * w.lay.h / w.lay.w;
+      if (!w.spot && hasWall()) w.spot = firstSpot(w);
+      const pose = winPose(w);
+      let handle = 'idle', busy = false;
+      for (const h of handsXR) {
+        const d = M.menus.handleDist(pose, w.h, h.at), was = w.pinch.get(h.id) || false;
+        w.pinch.set(h.id, h.pinch);
+        if (d < 0.06) { handle = 'near'; busy = true; }
+        if (!w.drag && h.pinch && !was && d < 0.05) w.drag = { id: h.id, off: [pose.x - h.at[0], pose.h - h.at[1], pose.y + h.at[2]] };
+      }
+      if (w.drag) {
+        const h = handsXR.find((q) => q.id === w.drag.id);
+        if (!h || !h.pinch) w.drag = null;
+        else { moveWin(w, h.at[0] + w.drag.off[0], -h.at[2] + w.drag.off[2], h.at[1] + w.drag.off[1] - space.floorY); handle = 'held'; busy = true; }
+      }
+      if ([...fists.values()].some((f) => f.what === `win:${w.id}`)) { handle = 'held'; busy = true; }
+      if (xr && !(w.spot && hasWall())) w.f.update(at, dt, busy);
+      if (!w.panel) { w.panel = new Panel(w.w, w.lay, { handle: true }); scene.add(w.panel.mesh); w.redraw = true; }
+      w.panel.setWidth(w.w); w.panel.handleLook(handle);
+      if (w.redraw) { w.panel.draw(w.lay, { hover: null, pressed: null }); w.redraw = false; }
+      w.panel.pose(winPose(w));
+    }
   }
   function roomText() { const r = room.info(); return r.kept ? `the server's, ${r.n} planes${r.by === null ? '' : ` from player ${r.by + 1}`}` : r.own ? `own scan, ${r.own} planes` : 'none'; }
   function status(now) {

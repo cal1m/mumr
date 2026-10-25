@@ -1,0 +1,162 @@
+// The lab's logic (boxes.js): box-on-box contact, pushing, a pile coming to rest, the island's numbers, the drift probe, the menu.
+const test = require('node:test');
+const assert = require('node:assert');
+const M = require('../../engine/client/index.js');
+const { Hub } = require('../../engine/test/hubfake.js');
+const L = require('./boxes.js');
+
+const settle = (w, secs, hands = []) => { for (let t = 0; t < secs; t += 1 / 72) w.step(1 / 72, t, hands); };
+// a pretend fingertip: a single point source at (x, y, z)
+const tip = (id, x, y, z) => ({ id, points: [{ name: 'index', x, y, z }] });
+
+test('a box dropped on another stands on it', () => {
+  const w = new L.World(2);
+  w.boxes[0].x = 0; w.boxes[0].y = 0; w.boxes[1].x = 0.01; w.boxes[1].y = 0; w.boxes[1].z = 0.5;
+  settle(w, 2);
+  assert.ok(Math.abs(w.boxes[0].z - L.HALF) < 0.003, 'the lower one is on the floor');
+  assert.ok(Math.abs(w.boxes[1].z - (L.HALF + L.SIZE)) < 0.005, `the upper one is on it (z ${w.boxes[1].z})`);
+});
+
+test('a stack stays up, and a push on the bottom box moves it away from under the others', () => {
+  const w = new L.World(1);
+  w.layout('stack', 3, [0, 0]);
+  settle(w, 1);
+  assert.ok(w.boxes.every((b, i) => Math.abs(b.z - (L.HALF + i * L.SIZE)) < 0.003), 'it stays as it was built');
+  // a fingertip moves into the bottom box from the left at 1 m/s
+  for (let i = 0; i < 40; i++) w.step(1 / 72, i / 72, [tip('h', -0.1 + i * 0.0139, 0, 0.06)]);
+  assert.ok(w.boxes[0].x > 0.01, 'the bottom box was pushed');
+});
+
+test('a box pushed into another pushes it', () => {
+  const w = new L.World(2);
+  w.boxes[0].x = 0; w.boxes[0].y = 0; w.boxes[1].x = 0.2; w.boxes[1].y = 0;
+  w.boxes[0].vx = 1;
+  settle(w, 1);
+  assert.ok(w.boxes[1].x > 0.2, 'the second box moved');
+  assert.ok(Math.abs(w.boxes[1].x - w.boxes[0].x) >= L.SIZE - 0.005, 'and they do not overlap');
+});
+
+test('thirty boxes dropped into a heap come to rest, and none is inside another', () => {
+  const w = new L.World(30);
+  w.layout('pile', 30, [0.5, 0]);
+  settle(w, 12);
+  assert.strictEqual(w.movingCount(), 0, 'all at rest');
+  const B = w.boxes;
+  for (let i = 0; i < B.length; i++) for (let j = i + 1; j < B.length; j++) {
+    const inside = Math.abs(B[i].x - B[j].x) < L.SIZE - 0.02 && Math.abs(B[i].y - B[j].y) < L.SIZE - 0.02 && Math.abs(B[i].z - B[j].z) < L.SIZE - 0.02;
+    assert.ok(!inside, `boxes ${i} and ${j} overlap`);
+  }
+  assert.ok(B.every((b) => b.z >= L.HALF - 0.003));
+});
+
+test('a pinch holds a box and carries it', () => {
+  const w = new L.World(1);
+  w.boxes[0].x = 0; w.boxes[0].y = 0;
+  const pinch = (x, z, start) => ({ id: 'r', pinch: true, points: [{ name: 'thumb', x, y: 0, z }, { name: 'index', x, y: 0, z }] });
+  for (let i = 0; i < 30; i++) w.step(1 / 72, i / 72, [pinch(0, 0.06)]);
+  assert.ok(w.boxes[0].held, 'held');
+  for (let i = 30; i < 90; i++) w.step(1 / 72, i / 72, [pinch(0, 0.06 + (i - 30) * 0.004)]);
+  assert.ok(w.boxes[0].z > 0.15, `it came up with the hand (z ${w.boxes[0].z})`);
+});
+
+test('the island: three players-worth of packets, and the numbers it counts', () => {
+  const hub = new Hub(), a = hub.link('A'), b = hub.link('B');
+  const mk = (link) => new M.session.Session(link, { game: L.GAME, player: L.PLAYER, actions: L.ACTIONS, press: L.press, kinds: L.KINDS });
+  mk(a); mk(b); hub.flush();
+  const w = new L.World(1);
+  w.layout('stack', L.ISLAND, [0.5, 0]);
+  const watch = new L.Watch();
+  assert.ok(watch.together(w));
+  watch.frame(w, 1 / 72);
+  w.boxes[2].x += 0.1;                                   // a box jumps 10 cm between two frames
+  watch.frame(w, 1 / 72);
+  assert.strictEqual(watch.report(w, 0, 0), null);
+  const r = watch.report(w, 3, 1500);
+  assert.strictEqual(r.jumps, 1);
+  assert.strictEqual(r.handovers, 3);
+  assert.strictEqual(r.together, true, '10 cm sideways is still a column');
+  w.boxes[4].x += 0.3;
+  assert.strictEqual(watch.together(w), false);
+});
+
+test('the island box: a packet round trip through the adapter', () => {
+  const w1 = new L.World(1), w2 = new L.World(1);
+  w1.layout('stack', L.ISLAND, [0.5, 0]); w2.layout('stack', L.ISLAND, [0.5, 0]);
+  const a1 = L.adapter(w1, 3, (s) => s, () => true), a2 = L.adapter(w2, 3, (s) => s, () => true);
+  w1.boxes[3].x = 0.9; w1.boxes[3].vz = 0.5; w1.boxes[3].z = 0.8;
+  const spec = M.wire.spec('lab4'), data = spec.unpack(new DataView(spec.pack(a1.pack()).buffer));
+  assert.ok(a2.apply(data, { first: true }));
+  assert.ok(Math.abs(w2.boxes[3].x - 0.9) < 1e-5 && Math.abs(w2.boxes[3].vz - 0.5) < 1e-5);
+  assert.strictEqual(a2.reach([tip('h', 0.9, 0, 0.8)]), true);
+  assert.strictEqual(a2.reach([tip('h', 3, 3, 0.8)]), false);
+  assert.strictEqual(L.adapter(w2, 3, (s) => s, () => false).reach([tip('h', 0.9, 0, 0.8)]), false, 'not touched outside the island');
+});
+
+test('drift: the first touch is the cross, later ones are measured against it', () => {
+  const d = new L.Drift({ every: 60, hold: 1, window: 20, rounds: 3 }), id = (xy) => xy;
+  d.start(0);
+  const touch = (t0, x, y) => { let row = null; for (let t = t0; t < t0 + 3 && !row; t += 0.1) row = d.update(t, [{ id: 'r', x, y, z: 0.01 }], id); return row; };
+  const r1 = touch(0, 1, 2);
+  assert.ok(r1.first); assert.deepStrictEqual(r1.common, [1, 2]);
+  assert.strictEqual(d.update(30, [], id), null, 'nothing is asked for between rounds');
+  const r2 = touch(60, 1.03, 2.04);
+  assert.strictEqual(r2.round, 2); assert.strictEqual(r2.mm, 50); assert.strictEqual(r2.dx, 30);
+  assert.strictEqual(d.largest, 50);
+  // a hand that keeps moving over the cross does not count; a missed round is recorded
+  let moving = null;
+  for (let t = 120; t < 150 && !moving; t += 0.1) moving = d.update(t, [{ id: 'r', x: 1 + t * 0.2, y: 2, z: 0.01 }], id);
+  assert.ok(moving && moving.missed, 'missed');
+  assert.strictEqual(d.on, false, 'three rounds are over');
+});
+
+test('drift: the other player\'s touch arrives as a document kind', () => {
+  const hub = new Hub(), a = hub.link('A'), b = hub.link('B');
+  const mk = (link) => new M.session.Session(link, { game: L.GAME, player: L.PLAYER, actions: L.ACTIONS, press: L.press, kinds: L.KINDS });
+  const sa = mk(a), sb = mk(b);
+  hub.flush();
+  sa.emit({ k: 'drift', slot: sa.me, round: 2, x: 1.5, y: 2 }); hub.flush();
+  assert.deepStrictEqual(sb.doc.drift[sa.me], { x: 1.5, y: 2, round: 2 });
+});
+
+test('perf: p50 and p95 of the frames in a window', () => {
+  const p = new L.Perf(990);
+  let r = null;
+  for (let i = 0; i < 100; i++) r = p.add(i * 10 + 10, i < 95 ? 10 : 30, 2) || r;
+  assert.ok(r && r.p50 === 10 && r.p95 === 30 && r.sim === 2);
+});
+
+test('the menu: the mode button cycles, the count only shows in the pile', () => {
+  assert.strictEqual(L.press('mode', { mode: 'pile', n: 10 }).mode, 'island');
+  assert.strictEqual(L.press('mode', { mode: 'drift', n: 10 }).mode, 'pile');
+  assert.strictEqual(L.press('n', { mode: 'pile', n: 50 }).n, 10);
+  assert.strictEqual(L.press('other', {}), null);
+  const ids = (st) => L.menu(st, {}).buttons.map((x) => x.id);
+  assert.ok(ids({ mode: 'pile', n: 10 }).includes('dropPile') && ids({ mode: 'pile', n: 10 }).includes('n'));
+  assert.ok(ids({ mode: 'drift', n: 10 }).includes('driftStart') && !ids({ mode: 'drift', n: 10 }).includes('n'));
+});
+
+test('a box steered from the room model follows its target, and takes the others with it', () => {
+  const w = new L.World(2);
+  w.boxes[0].x = 0; w.boxes[0].y = 0; w.boxes[1].x = 0.3; w.boxes[1].y = 0;
+  w.boxes[0].steer = [0.6, 0, 0.06];
+  settle(w, 2);
+  assert.ok(w.boxes[0].x > 0.4, `it went towards the target (x ${w.boxes[0].x})`);
+  assert.ok(w.boxes[1].x > 0.3, 'and pushed the other one');
+  w.boxes[0].steer = null;
+  assert.ok(!w.boxes[0].held);
+});
+
+test('the windows: wrapped text, and a data line for each experiment', () => {
+  assert.ok(L.wrap('a '.repeat(100).trim(), 20).every((l) => l.length <= 20));
+  for (const mode of L.MODES) {
+    const lay = L.description(mode);
+    assert.ok(lay.buttons.length > 8 && lay.buttons.every((b) => b.left), mode);
+    assert.ok(lay.buttons.some((b) => /passes/.test(b.label)), `${mode} says what passes`);
+  }
+  const drift = new L.Drift();
+  const base = { perf: null, pile: { n: 10, moving: 0 }, island: { together: true, moving: 0, last: null, totals: { handovers: 0, jumps: 0, worst: 0, broken: 0 }, holders: ['nobody'] }, drift, nextIn: 0, me: 0, players: 1, lined: true, rtt: 1 };
+  assert.ok(L.dataLines(Object.assign({ mode: 'pile' }, base, { perf: { fps: 72, p50: 13, p95: 15.2, sim: 0.5 } })).some((l) => /OVER/.test(l)));
+  assert.ok(L.dataLines(Object.assign({ mode: 'island' }, base)).some((l) => /together/.test(l)));
+  assert.ok(L.dataLines(Object.assign({ mode: 'drift' }, base)).some((l) => /not started/.test(l)));
+  assert.ok(L.dataLayout(Object.assign({ mode: 'pile' }, base)).buttons.length > 3);
+});
