@@ -41,12 +41,21 @@
     }
     return out.length ? { planes: out } : null;
   }
+  // two scans are the same when they have the same planes (label, upright or not, as many corners) and no corner moved more than tol (m)
+  function sameScan(a, b, tol = 0.03) {
+    if (!a || !b) return a === b;
+    if (a.planes.length !== b.planes.length) return false;
+    return a.planes.every((p, i) => {
+      const q = b.planes[i];
+      return p.l === q.l && p.v === q.v && p.p.length === q.p.length && p.p.every((c, k) => Math.abs(c[0] - q.p[k][0]) <= tol && Math.abs(c[1] - q.p[k][1]) <= tol && Math.abs(c[2] - q.p[k][2]) <= tol);
+    });
+  }
   const mapRoom = (room, fn) => (room ? { planes: room.planes.map((q) => ({ l: q.l, v: q.v, p: q.p.map((pt) => fn(pt).map(r2)) })) } : null);
 
   class Room {
     constructor(session, space, opts = {}) {
       this.S = session; this.space = space; this.opts = opts;
-      this.own = null; this.ownSig = '';
+      this.own = null;
       this.tried = false;                     // this connection has had its one look at whether the server needs a room
       this.choice = null;                     // { rooms, picked: Set } while the player picks which rooms to import
       this.here = null;                       // [x, y]: where this headset stands
@@ -57,10 +66,11 @@
     static get ACTIONS() { return ACTIONS; }
     _life(t) { if (this.opts.life) this.opts.life(t); }
     _say(t) { if (this.opts.say) this.opts.say(t); }
+    // (the headset's planes shift by a centimetre or so between two reads: that is the same scan, kept as it was. Taking every read as
+    // new filled the log with thousands of "scan has 40 planes" lines, 2026-10-23)
     setScan(room) {
-      const sig = room ? JSON.stringify(room.planes) : '';
-      if (sig === this.ownSig) return false;
-      this.own = room; this.ownSig = sig;
+      if (sameScan(this.own, room)) return false;
+      this.own = room;
       this._life(`room: this headset's scan has ${room ? room.planes.length : 0} planes`);
       return true;
     }

@@ -183,3 +183,13 @@ test('the grips: a fist holds the cube as well as a pinch; a hand closing on it 
   cube.step(0.016, t += 0.016, [{ id: 'l', pinch: false, points: [{ name: 'thumb', x, y: -0.01, z: C.HALF }, { name: 'index', x, y: 0.01, z: C.HALF }] }]);
   near(cube.x, 0, 1e-9, 'not pushed while closing');
 });
+
+test('a scan that only shifts by a centimetre is the same scan (no new log line); a real change is new', () => {
+  const S = new M.session.Session(null, {}), lines = [], R = new M.room.Room(S, new AL.Space(null, 0), { life: (t) => lines.push(t) });
+  const jitter = (d) => ({ planes: scan().planes.map((p) => ({ l: p.l, v: p.v, p: p.p.map((c) => [c[0] + d, c[1] - d, c[2] + d]) })) });
+  assert.strictEqual(R.setScan(scan()), true);
+  for (let i = 0; i < 50; i++) assert.strictEqual(R.setScan(jitter(((i % 3) - 1) * 0.01)), false);
+  assert.strictEqual(lines.length, 1, lines.join(' | '));
+  assert.strictEqual(R.setScan(jitter(0.2)), true, 'moved 20 cm: new');
+  assert.strictEqual(R.setScan({ planes: scan().planes.slice(1) }), true, 'a plane fewer: new');
+});
