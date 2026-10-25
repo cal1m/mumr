@@ -1,4 +1,6 @@
-﻿# MUMR: multi-user mixed reality
+﻿<p align="center"><img src="docs/brand/mumr-logo.svg" width="140" alt="MUMR logo"></p>
+
+# MUMR: multi-user mixed reality
 
 An engine for shared mixed-reality worlds in the browser: two to four people in one room wear headsets (Quest 3, Quest Pro; a WebXR page,
 nothing installed), see the same virtual things in the same real places, and touch them with their hands. A PC on the same network serves
