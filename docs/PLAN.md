@@ -1,8 +1,8 @@
-# MUMR: extraction plan (refreshed 2026-10-22)
+# MUMR: extraction plan (refreshed 2026-10-22, status 2026-10-25)
 
-**For the session that continues the extraction.** Read [NOTES.md](NOTES.md) first (what the Nudgy chats decided and what was
-streamlined), then [ARCHITECTURE.md](ARCHITECTURE.md). The first plan was written inside Nudgy on 2026-10-15
-(`KTE/Project2/docs/superpowers/plans/2026-10-15-mr-multiplayer-extraction.md`); this file replaces it.
+**For the session that continues the extraction.** Read [NOTES.md](NOTES.md) first (what the Nudgy chats decided, what was
+streamlined, and items 29-34 for what the headset runs of 10-22/23 found), then [ARCHITECTURE.md](ARCHITECTURE.md). The first plan was
+written inside Nudgy on 2026-10-15 (`KTE/Project2/docs/superpowers/plans/2026-10-15-mr-multiplayer-extraction.md`); this file replaces it.
 
 **Why:** Marek wants more multi-user mixed-reality projects without rebuilding Nudgy's each time: "a virtual physical world where it is
 easy to make these types of experiences, where all virtual objects behave as if they were physical" (2026-10-16). The realistic scope
@@ -13,66 +13,104 @@ install on the headsets.**
 
 | 2026-10-15 plan | Now | Why |
 |---|---|---|
-| Make Nudgy's files generic **in place** (phase 1), then move them | The engine is written **fresh in its own repo** from Nudgy's files; Nudgy is untouched until a migration phase | Nudgy works and was tested on two headsets; Marek cannot test now. A fresh copy let the API be cleaned (self-describing events, owned things, one packet header) without breaking it. Migration is one deliberate step (phase 6). |
-| Name `mrmp` (to be chosen) | **MUMR** (Marek's name for it), repo `machmar/mumr`, private | |
+| Make Nudgy's files generic **in place** (phase 1), then move them | The engine is written **fresh in its own repo** from Nudgy's files; Nudgy is untouched until a migration phase | Nudgy works and was tested on two headsets; Marek could not test then. A fresh copy let the API be cleaned (self-describing events, owned things, one packet header) without breaking it. Migration is one deliberate step (phase 7). |
+| Name `mrmp` (to be chosen) | **MUMR** (Marek's name for it), repo `machmar/mumr`, **public under MIT** since 2026-10-22 | |
 | Hub keeps Nudgy's kinds; `Hub(build, bodies, owned)` | The hub keeps **any** app's document: events carry `key/drop/clear/scope/own` | NOTES 2.1 |
 | Cameras were not in the map (built later, 10-15) | **Owned things** are a general feature (`own`, `gone`, `ask`) | NOTES 2.2 |
 | The PC feed (viewer role, compacted document, clocks) was a separate plan | It is part of the engine (`WorldFeed`, viewer role); the unused `feed` role is dropped | Built and proven in Nudgy 10-15 |
-| Players sync from the `sim` holder | Players get the document from the hub (like viewers); a body's full state comes from its holder (`keyframe`) | NOTES 2.15; the document now outlives everyone leaving (Marek's room rule of 10-21) |
-| `Body` with the touch policy | Policies `touch` and `owner` built; `host` planned | Lumber Tycoon discussion, 10-16 |
+| Players sync from the `sim` holder | Players get the document from the hub (like viewers); a body's full state comes from its holder (`keyframe`) | NOTES 2.15; the document outlives everyone leaving |
+| `Body` with the touch policy | Policies `touch` and `owner`, and the `host` role | Lumber Tycoon discussion, 10-16 |
 | Example: one cube | First example is a **counter** (no XR, two tabs); the cube follows with XR | A page that loads the engine from `/mumr/` had to be proven first |
 | Not planned | Always-on server log and page life log are engine features | Debugging lessons of 10-21/22 |
+| Interaction "physical and literal, no gesture guessing" | Still the rule for buttons (a fingertip through them). Grabbing and moving use a small set of engine **gestures** (pinch, fist, point, flat hand) that every app gets the same | Marek asked for each of them, 2026-10-22/23 (NOTES 30-34) |
 
 ## 2. Status
+
+States: **done** = built, tested in Node, rehearsed on the PC and used on a headset; **built** = built and tested, not yet (fully) on a
+headset (section 4 says what is missing); **not started**. Rows are in the order they were done; section 3 says what comes next.
 
 | Phase | What | State |
 |---|---|---|
 | 0 | Repo, notes, refreshed plan | **done** 2026-10-22 |
-| 1 | Core without THREE: server (`ws`, `hub`, `serverlog`, `serve`), client (`util`, `link`, `align`, `wire`, `session`, `presence`, `body`, `worldfeed`, `life`), tests, `examples/counter` | **done** 2026-10-22: 58 Node tests, 39 Python tests, the counter checked in two browser tabs. Not on a headset. |
-| 2 | Everyone's menus (no THREE): panel poses through `Space`, the `M` stream, the other player's menu drawn from that player's state and mode, a press on anyone's menu | **built** 2026-10-22: `menus.js` (`grid`, `hit`, `axes`, `Poke`, `Menus`), `follow.js`; tested; checked in two tabs (B pressed A's buttons, A's line-up mode showed on B). Not on a headset. |
-| 3 | XR glue (ES modules with THREE, `xr/`): session start, hand sources from the 25 joints, pinch rule, line-up UI on `Aligner`, persistent anchor + reset handling (`anchor.js`, from Nudgy's 2026-10-22 fix), ghost hands of others, depth-only hand mask, build-stamp self-reload | **built** 2026-10-22 except the depth-only hand mask (ghost fingers are drawn over the menus instead): `hands.js`, `anchor.js` (Keeper), `lineup.js` (LineUp) with tests (one replays the 10-22 put-on), `xr/session.js` (also asks for the `shared` space and logs the answer), `xr/input.js`, `xr/ghost.js`, `xr/players3d.js`, `xr/panel3d.js`. The XR modules only ran as far as loading in a desktop browser. |
-| 4 | `examples/cube`: floor, one cube (a Body), a counter on a menu, both players' hands; PC rehearsal with two tabs, then one headset run | **done** 2026-10-22 (rehearsed in two tabs + the PC view: push, token handover, presses across menus, lining up with the mouse); first run on one Quest Pro (2026-10-22) found five faults, all fixed the same day; **the two-headset run the same evening worked** ("it seems to have worked well"); two faults from its log fixed (NOTES 27, 28). The app is 235 lines and `cube.js` 155: over the 150-line target, mostly the desktop rehearsal and the menus' wiring, which a helper could take (NOTES 2.20). |
-| 4c | Coming back after a Wi-Fi drop (first headset run: a 4 s stall made the headset a new player) | **done** 2026-10-22: the hub keeps a dropped player's place for 10 s, the link rejoins with its key, `bye` for a deliberate close; tested in Node, Python and against the real server; not yet seen on a headset |
-| 6 | Host role: a Node process on the PC that holds the bodies nobody touches; a touch hands the token to that headset at once, a body at rest and untouched comes back to it; keeps the cube where it was left when every headset leaves | **done** 2026-10-22: hub role `host` (slot 15, not a player), `client/host.js`, `examples/cube/host.js`, the server starts and restarts it (`mumr.json` `host`); tests with the pretend and the real server; rehearsed in the browser (pushed, given back at rest, a page opened later found the cube where it was left). Not yet on a headset. Rules that need no hand (joystick games) can live in the same host module when a game needs them |
-| 6b | `xr/app.js`: one `createApp({...})` for what every app wired again (scene, link, session, line-up, wrist menu, everybody's menus with the handle and the press, presence and legs, ghosts, entering XR with the anchor keeper, the desktop rehearsal, giving bodies up while the page is not looked at, status, build reload), so the cube app is the cube only (NOTES 20) | **done** 2026-10-22: the cube page went from 276 lines to 34; rehearsed in two tabs + the PC view (press across menus, cube here, pinch grab, the view draws both menus). Not yet on a headset |
-| 4b | The line-up menu's other two rows, as in Nudgy: **Room** and **Camera** | **Room done** 2026-10-22 (`client/room.js`, NOTES 29: the server's room, uploaded once by the first headset or by the Upload button; the cube rests on tables and stops at walls; rehearsed in two tabs + the PC view, not yet on a headset). **Camera** waits for a webcam page |
-| 5 | Many bodies: an entity-list packet with a per-entry token check on the hub; sleeping bodies (kept on the hub, not sent); contact islands (one token for a touching group) | not started (tokens by name are already done); **waits for Marek's three experiments** (pile, drift, island: NOTES 4.2), which he will run later |
-| 7 | Nudgy on MUMR (see 4.) | **not now** (Marek, 2026-10-22) |
-| 8 | Direct lane between headsets (WebRTC data channel behind `link`, server lane as fallback) | not needed so far (Nudgy probe 10-15: same median, no long silences) |
-| - | Automatic line-up from the `shared` reference space | not usable yet: granted on both headsets (his flag is on) but never got a UUID, even with two headsets in the room (2026-10-22); the touched spots stay |
+| 1 | Core without THREE: server (`ws`, `hub`, `serverlog`, `serve`), client (`util`, `link`, `align`, `wire`, `session`, `presence`, `body`, `worldfeed`, `life`), tests, `examples/counter` | **done** 2026-10-22 (the counter itself never ran on a headset; everything it proves runs under the cube) |
+| 2 | Everyone's menus: panel poses through `Space`, the `M` stream, the other player's menu drawn from that player's state and mode, a press on anyone's menu | **done** 2026-10-22 (two-headset run) |
+| 3 | XR glue (`xr/`): session start, hand sources from the 25 joints, pinch rule, line-up on `Aligner`, persistent anchor + reset handling, ghost hands of others, build-stamp self-reload, **hand cutouts** (`xr/handmask.js`, Nudgy's depth-only hand model with its 24 mm tip reach, ported 10-23) | **done** (cutouts: "work good", 10-23) |
+| 4 | `examples/cube`: one cube (a Body), a menu, both players' hands; PC rehearsal, then headsets | **done** 2026-10-22; two-headset run worked; faults fixed (NOTES 22-28) |
+| 4c | Coming back after a Wi-Fi drop (the hub keeps a dropped player's place for 10 s) | **done**: seen on the headsets ("came back to its place" in the logs of 10-22/23) |
+| 6 | Host role: a Node process on the PC holds the bodies nobody touches, the server starts and restarts it | **done**: the headsets saw the cube "simulated by host" and the hand-over both ways |
+| 6b | `xr/app.js` `createApp({...})`: the page wiring every app repeated | **done**; the cube page is the cube only |
+| 6c | The engine's wrist menu (`sysmenu.js`): Line up, Room setup, Exit; folds after 5 s hidden | **done** 2026-10-22 (Marek's rules, NOTES log) |
+| 4b | The line-up menu's other rows, as in Nudgy: **Room** and **Camera** | **Room done**: the server's room (`room.js`, NOTES 29), uploaded once by the first headset or by Upload; a scan with several rooms is split and picked on a map (NOTES 33). **Camera** not started: waits for a webcam page |
+| 9 | Cube physics against the room (NOTES 30): springy hold, 1 cm steps (nothing passes a wall), footprint support, tables with space under them, solid objects | **done** (10-22 run; one-finger push broke and was fixed, see section 4) |
+| 10 | Engine gestures (`grab.js`, NOTES 31, 34): pinch, fist, point (a ray and `pointAt`: the app's boxes and the room), flat hand as a platform (palm up or down); the fist moves the room model, the menu and the viewer; `noHold` | **built**: pointing works on the headset; the platform, the fist grab of the cube and the fist moves are untested |
+| 11 | Hand wall (`xr/handwall.js`): a window on a wall with every hand and its gesture numbers; solid tube hands, every frame (NOTES 34) | **built**: the first version ran on the headset; the tube hands are untested |
+| 12 | Room model (`model.js`, `xr/roommodel3d.js`, NOTES 32-33): move the cube and the viewer in a small copy of the room; carry, turn and scale handles; Show hand IRL; shared like a menu | **done** for one and two players ("works pretty good", "that works well", two-player test 10-23); the enlarged hand's fix of 10-23 is untested |
+| 13 | Feet as shoes from body tracking (`feet: 'off' \| 'show' \| 'kick'`), legs removed | **built**: off by default and in the cube; the other modes never ran (Marek: "pretty sure those work") |
+| 5 | **Many bodies**: an entity-list packet with a per-entry token check on the hub; sleeping bodies; contact islands (one token for a touching group); cube-to-cube contact | **not started**: the experiment pages of section 3.1 come first and decide its shape |
+| 7 | Nudgy on MUMR (section 5) | **not now** (Marek, 2026-10-22) |
+| 8 | Direct lane between headsets (WebRTC behind `link`) | not needed so far (Nudgy probe 10-15: same median, no long silences) |
+| - | Automatic line-up from the `shared` reference space | not usable yet: granted on both headsets but never got a UUID (2026-10-22); the touched spots stay |
 
-Rows are in the order they will be done. Open from the runs and only measured, not fixed: the PC view felt about 300 ms late in the
-second run; its log line now says how late each stream arrives by its stamps, to be read after the next run.
+Open, measured but not fixed: the PC view felt about 300 ms late (10-22); its log line says how late each stream arrives, to be read
+after a run in which the PC view is open (section 4).
 
-## 3. Phases 2 to 6 in more detail
+## 3. Next, in this order
 
-**2. Menus.** Nudgy's `menus.js` (`panelOut/In`, `wristOut/In`) becomes `Space.poseToCommon` plus a small `Menus` class: this page's
-panel poses out at 10/s as `M` (JSON, now with a clock), the others' in, a `known(id)` filter given by the app. The panel drawing stays
-the app's; the rule from Nudgy that the other player's menu is drawn **from that player's state and mode** (Nudgy M4) goes in the HOWTO
-and in the class (the `M` packet carries the mode). Presses are already routed by `Session.press`.
+1. **One headset session for section 4** (about 15 minutes, one headset is enough for most of it; the list says which items need two).
+2. **The experiment pages (3.1)**, then Marek runs them: they decide phase 5.
+3. **Phase 5, many bodies (3.2)**, shaped by what the experiments measured.
+4. **Camera row** of the line-up menu, when a webcam page is wanted.
+5. **Phase 7** only when Marek says so.
 
-**3. XR glue.** What every MR app repeats, taken from `app.js` (about 2700 lines, of which roughly 600 were multiplayer glue and 150 the
-anchor dance). Put the decisions in plain modules (testable) and the WebXR/THREE calls in thin ES modules:
-- `anchor.js` (plain): `Resets` (in `align.js` already) plus the re-find state machine: settle 2 s without a reset and visible, ask for
-  the persistent anchor again, believe it once its pose has been the same for 0.7 s, give up after 9 s; save/load of the line-up against
-  the anchor's handle. Inputs injected (`restore(uuid)`, `pose(anchor)`), so Node tests can play the 2026-10-22 recordings.
-- `hands.js` (plain): sources from the 25 joints, the pinch rule (select event, or index and thumb tips < 22 mm), the palm platform.
-- `xr/session.js`, `xr/hands3d.js`, `xr/lineup3d.js`, `xr/players3d.js`, `xr/handmask.js` (THREE).
-- Interaction rule to keep: **physical and literal** (a fingertip through a button, a hand in a node, no gesture guessing).
+### 3.1 Experiment and stress pages (to build)
 
-**4. Cube.** If the app is under about 150 lines, the API is right; if not, what is missing is the finding. Before investing in phase 5,
-the three cheap experiments proposed on 2026-10-16 could run on it (NOTES 4.2): 20-30 cubes in a pile (Quest frame time, handover
-jitter), 10 minutes of both players touching one marker (drift), one player pushes a stack while the other takes its top (islands).
+Each is an app in `examples/` built on `createApp`, with its numbers in the life log (so `mumr-server.log` has them after the run, with
+nothing to copy off the headset) and on its menu. Every page has a rehearsal mode on the PC (`?name=A&frame=...&room=demo`) and a Node
+test of its logic with pretend headsets, as the cube has. Start the server and check that the log grows before anyone puts a headset on.
 
-**5. Many bodies.** A packet `E` = list of `(id u16, token holder implied by the hub's table, state)`. The hub checks each entry against
-its token and drops the ones the sender does not hold (today it checks whole packets by type). Only moving entries are sent; the hub keeps
-the newest per id for newcomers. Objects resting on a carrier become its children in the document (no physics of their own).
+| Page | What it measures | How it is built | How it is run, and what passes |
+|---|---|---|---|
+| `examples/pile` (?n=10/20/30/50) | Quest frame time with N bodies simulated; later, hand-over jitter | N cubes on the floor in a grid, a button that drops them into one pile. **Needs cube-to-cube contact first** (cube.js only knows hands and the room): boxes as turned squares, support from the highest box under the footprint (as the room's `support`, NOTES 30), push-out between boxes in the same 1 cm steps. Before phase 5 every cube is simulated on every page with no sharing (the measurement is the page's own cost). The page logs every 5 s: frames per second, frame time p50/p95 (ms), simulation time per frame (ms), N, how many cubes are moving | One headset: run n = 10, 20, 30, 50; poke the pile. Pass: frame time p95 under 13.9 ms (72 Hz) at 30 cubes, the pile comes to rest. The result says how many bodies one page can simulate, and so whether sleeping bodies (phase 5) are needed or only nice |
+| `examples/drift` | How far the line-up drifts over 10 minutes: one headset against the room, two headsets against each other | Uses the line-up's check mark (spot 3) as it is: a printed cross, a timer that every minute says "touch the cross", and on the touch logs where the fingertip is against where the line-up says the cross is (mm, and the mm between the two players when both touch). Ten rows in the log; a menu shows the last and the largest | Alone: line up, then 10 minutes walking about, touching the cross each minute. Two: both do it on the same cross. Pass: under 2 cm after 10 minutes; if not, the anchor keeper needs a re-check timer (anchor.js) |
+| `examples/island` (after `pile` has contact) | What happens to a stack when two players touch it at once | A stack of 3-5 cubes; one player pushes the bottom while the other lifts the top. With today's one token per body each cube changes hands on touch; the page logs token hand-overs per second, jumps of a cube (> 2 cm between two drawn frames) and whether the stack stayed together | Two headsets. First run shows today's failure (the baseline). Phase 5's islands (one token for a touching group) pass when the stack moves as one with no jumps |
+| `tools/stress.js` (Node, no headset) | Hub and network load for many players and bodies | Starts N pretend players (`tools/standin.js` does one) that send presence at 45/s and own M moving bodies each, against the real server; logs packets/s in and out, the hub's CPU, and the delay from send to receive | PC only: 4 players x 30 bodies. Pass: no queue growth, delay under 30 ms on localhost. Run again over Wi-Fi with two machines when phase 5 has its packet |
 
-**6. Host.** `node client/host.js app/rules.js` connects as a player with role `host` (a new role: not counted, no presence, holds bodies
-at rest). The rules are a plain script that also runs in the page when nobody hosts (the alone rule). Needed for joystick games and for
-"nothing is lost when every headset leaves" with bodies (the document already survives).
+### 3.2 Phase 5 (when the experiments are in)
 
-## 4. Nudgy on MUMR (phase 7, when Marek says so)
+A packet `E` = list of `(id u16, state)`, the holder implied by the hub's table: the hub checks each entry against its token and drops
+the ones the sender does not hold (today it checks whole packets by type). Only moving entries are sent; the hub keeps the newest per id
+for newcomers; a body at rest is asleep (kept by the hub and the host, not sent, not simulated until something touches it). Bodies
+resting on a carrier move with it. Contact islands: bodies that touch form a group with one token, so two players touching one stack do
+not tear it apart. Test with two pretend headsets in Node first (a stack handed over, a sleeping body woken by a far player's hand), then
+`pile` and `island` on headsets.
+
+### 3.3 Camera row (4b)
+
+As in Nudgy: real webcams as owned things (`own`, `gone`) from a webcam page on the PC, three knobs in front of each to place it, and
+Reset. Test: one webcam, two tabs, then a headset placing it.
+
+## 4. Untested (2026-10-25)
+
+From the server logs of 10-22/23 and Marek's answers of 10-25. Each line says how to test it. One headset is enough unless it says two.
+
+| What | Since | How to test it | Marek's answer 10-25 |
+|---|---|---|---|
+| A cube put on a flat hand (palm up and back of the hand up), carried, falling off when the hand tilts | 10-23 | Make the hand flat, put the cube on it with the other hand; walk; turn the hand over; tilt it past about 45 degrees | not tried |
+| One finger pushes the cube (the fix for "I can't push it with one finger") | 10-23 | Point and push the cube along the floor with the index | not tried |
+| Grabbing the cube with a fist; the finger colours (green pinch, orange fist) | 10-22 | Make a fist at the cube, carry it, open; watch the colours | not tried |
+| Another player pressing your room picker's map | 10-23 | Two headsets: A presses Upload with a two-room scan; B picks a room on A's wrist menu and presses Import | not tried |
+| The PC view during a headset run (models, hand wall, pointing rays, the 300 ms lag line) | 10-23 | Open `view.html` on the PC during any run; afterwards read the "late by their stamps" lines in the log | not tried |
+| The fist moves the room model, your menu and the viewer (the viewer along the walls) | 10-23 | Fist inside the model, carry; fist on the menu, carry; fist on the hand wall, slide it to another wall; check the cube is not grabbed by that fist | built after the last run |
+| The hand wall's tube hands, redrawn every frame (and the frame rate with it on) | 10-25 | Look at the hand wall while making each gesture | built after the last run |
+| Show hand IRL in a model scaled way down: the whole hand, as thick as it is long | 10-23 | Scale the model down with the pill, reach in | built after the last run |
+| The scan log spam fix: one "scan has N planes" line, not thousands | 10-25 | After any run, count those lines in `mumr-server.log` | built after the last run |
+| Feet `show` and `kick` | 10-22 | Set `feet: 'show'` in the cube's `app.js`, look down; then `'kick'` and kick the cube | "pretty sure those work" (never ran) |
+
+Tested and working on the headset (for the record): pointing, rays and signs (10-23); hand cutouts; the room model with two players;
+the room picker (one player); the scale pill and Show hand IRL; the cube held from the model; the room upload rules; collisions with
+the room; rejoining after a drop; the host; the wrist menu; lining up.
+
+## 5. Nudgy on MUMR (phase 7, when Marek says so)
 
 What changes in Nudgy, so the size of it is known:
 
@@ -80,19 +118,21 @@ What changes in Nudgy, so the size of it is known:
 |---|---|
 | `mr/link.js`, `mr/align.js`, `mr/ws.py` | MUMR's (same behaviour; `Space` replaces the conversions in `holoshare.js`, `menus.js`, `cams.js`, `capture.js`) |
 | `mr/wire.js` | MUMR's registry; Nudgy registers `S` (1) and `H` (3). `P` and `S` are byte-identical (their clock already sits in bytes 2-5); `H` and `M` gain the 4-byte clock |
-| `mr/session.js` | MUMR's `Session` with Nudgy's kinds: `mark+`/`mark-`/`mark~` (send the whole mark again for `~`: an event with a key says all of it), `room`, `net`, `cam+`/`cam-` (owned), `game`/`player` (field `key` -> `name`) |
+| `mr/session.js` | MUMR's `Session` with Nudgy's kinds: `mark+`/`mark-`/`mark~`, `net`, `cam+`/`cam-` (owned), `game`/`player` (field `key` -> `name`); the room is MUMR's (`room.js`) |
 | `mr/hub.py` | MUMR's hub with `bodies: ["sim", "holo"]`, `owned: {1: "sim", 3: "holo"}`; `_keep`, `_forget`, the camera code and `cam>` go (owned things, `ask`) |
 | `mr/share.js`, `mr/holoshare.js`, `mr/replica.js` | two `Body` adapters (the loco with the balls, the viewer); `Replica`'s smoothing stays Nudgy's (or becomes a helper) |
 | `mr/worldfeed.js` | MUMR's `WorldFeed` with Nudgy's kinds and types; `view.js` reads `sample('loco')` etc. as before |
 | `serve_https.py` | a start script that calls `serve.run(app, routes={...})` with `/relay/*`, `/networks.json`, `/probe/log` |
-| `app.js` | the "players" sections shrink to wiring; after phase 3, the anchor dance and hand sources go too |
+| `app.js` | `createApp`; the anchor dance, hand sources, menus, wrist card, hand masks and feet are the engine's; the palm platform is `grab.js` |
 
 Check after the move: all of Nudgy's tests (497 Node, 72 Python on 2026-10-22) that are not now MUMR's, two tabs, then one two-headset
 session with the server log running first (loco, balls, marks, room, settings, menus, viewer, cameras, take-off/put-on).
 
-## 5. Definition of done (for the extraction as a whole)
+## 6. Definition of done (for the extraction as a whole)
 
-- The engine works on its own: its tests pass without Nudgy's files. **(done for phase 1)**
-- `examples/cube` runs with two tabs and once on two headsets.
+- The engine works on its own: its tests pass without Nudgy's files. **(done: 101 Node, 48 Python on 2026-10-25)**
+- `examples/cube` runs with two tabs and on two headsets. **(done 2026-10-22/23)**
+- The experiments of 3.1 have been run and phase 5 is built or decided against.
+- Nothing in section 4 is left untested.
 - Nudgy runs on MUMR with its tests green and one two-headset session as before, **or** Marek decided it stays as it is.
 - ARCHITECTURE.md and HOWTO-NEW-APP.md are current, and Nudgy's `CLAUDE.md` points at them.
