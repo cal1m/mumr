@@ -6,6 +6,7 @@
   "scripts": {
     "test": "node --test",
     "test:py": "py -3 -m unittest discover -s engine/server/tests -p \"test_*.py\"",
-    "counter": "py -3 engine/server/serve.py apps/counter 8766 --http --no-browser"
+    "run": "node tools/run.js",
+    "new-app": "node tools/new-app.js"
   }
 }
