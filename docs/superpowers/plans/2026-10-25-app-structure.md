@@ -83,3 +83,10 @@ Each step ends with `node --test` and the Python tests green, and is its own com
 ## Progress
 
 - Step 1 done: `client/`, `server/`, `test/` are under `engine/`; `node --test` (102) and the Python tests (48) pass.
+- Steps 2-9 done (2026-10-25). Differences from the plan above:
+  - `new-app` does not pick a packet type for the new app: the template has no body of its own, so it prints the next free type instead.
+  - Step 7 needed no change: `node --test` already finds `apps/*/*.test.js` and `tools/*.test.js`. Node 24 does not take a folder
+    (`node --test apps/x` fails); use `node --test "apps/x/*.test.js"`.
+  - The template is `index.html`, `logic.js` (plain, tested), `app.js`, `app.test.js`, `README.md`, `mumr.json`.
+  - `--viewer` copies `tools/viewer/` (a plain page showing the count and the players through a WorldFeed).
+  - Checked in a browser tab (not a headset): the template and a scaffolded app with `--viewer`: both pages load, a press in one shows in the other.

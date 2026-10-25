@@ -1,18 +1,29 @@
 # Making a new MUMR app
 
-The smallest working app is [`apps/counter`](../apps/counter) (no XR). Read [ARCHITECTURE.md](ARCHITECTURE.md) first.
+The quick way:
+
+```bash
+node tools/new-app.js MyApp           # makes apps/my-app from apps/_template (--viewer adds a PC view page)
+node tools/run.js my-app --http       # then two tabs: /?name=A&frame=0,0,0 and /?name=B&frame=1,0.5,40
+node --test "apps/my-app/*.test.js"
+```
+
+You get a working app on `createApp` (section 3b): a shared count, each player's colour, an action button and a menu. Change `logic.js`
+(settings, buttons, menu) and `app.js` (what is drawn and simulated); [`apps/_template/README.md`](../apps/_template/README.md) lists the
+files. [`apps/cube`](../apps/cube) is the full example. Read [ARCHITECTURE.md](ARCHITECTURE.md) first. The rest of this page is what is
+behind it.
 
 ## 1. A folder and the server
 
 ```
-myapp/
+apps/myapp/
   mumr.json        {"title": "My app", "index": "index.html", "bodies": ["ball"], "owned": {"16": "ball"}}
   index.html       loads /mumr/*.js, then the app's scripts
   app.js
 ```
 
 ```bash
-py -3 path/to/mumr/server/serve.py path/to/myapp
+node tools/run.js myapp               # or: py -3 engine/server/serve.py apps/myapp
 ```
 
 It prints the address for the headsets (`https://<PC>:8443/`), writes `mumr-server.log` in the app's folder, and serves the engine at

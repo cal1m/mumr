@@ -8,7 +8,7 @@ the pages and keeps the shared state; PC pages can watch the whole world live.
 
 Extracted from **Nudgy** (KTE Project2, a toy loco tried out in mixed reality), where it ran on two headsets from 2026-10-13 to 2026-10-22.
 **Status 2026-10-22:** the core, everyone's menus, the XR parts (hands, line-up, anchor keeper, ghost hands, panels) and the cube demo
-are built and tested (70 Node tests, 39 Python tests); the counter and the cube were rehearsed in browser tabs with the PC view. **Nothing
+are built and tested (70 Node tests, 39 Python tests); the template app and the cube were rehearsed in browser tabs with the PC view. **Nothing
 of MUMR has run on a headset yet**: the cube is ready for that ([apps/cube/README.md](apps/cube/README.md)).
 See [docs/PLAN.md](docs/PLAN.md).
 
@@ -25,10 +25,10 @@ One common floor frame from two touched floor spots; everything is sent in it. D
 ## Try it
 
 ```bash
-py -3 engine/server/serve.py apps/counter 8766 --http --no-browser
+node tools/run.js _template --http
 ```
 
-Open `http://localhost:8766/` in two tabs. Press +1 in one and watch the other. For headsets, leave out `--http` and open the printed
+Open `http://localhost:8766/?name=A&frame=0,0,0` and `/?name=B&frame=1,0.5,40` in two tabs. Press Count in one and watch the other. For headsets, leave out `--http` and open the printed
 `https://` address on each (accept the certificate once).
 
 ## Layout
@@ -40,7 +40,8 @@ engine/client/    util link align wire session presence body worldfeed life hand
 engine/client/xr/ session input ghost players3d panel3d   ES modules for WebXR, THREE handed in
 engine/test/      Node tests (hubfake.js: a pretend server for several pretend headsets in one process)
 engine/server/tests/   Python tests
-apps/      counter (no XR), cube (the XR demo, with a PC view)
+apps/      _template (the smallest app; tools/new-app.js copies it), cube (the XR demo, with a PC view)
+tools/     new-app.js (make an app), run.js (run one by name)
 docs/      ARCHITECTURE.md  HOWTO-NEW-APP.md  PLAN.md  NOTES.md (what was learnt, and what was streamlined)
 ```
 
