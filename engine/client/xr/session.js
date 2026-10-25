@@ -28,7 +28,7 @@ export async function enterXR({ renderer, life = () => {}, onReset = () => {}, o
   session.addEventListener('selectstart', (e) => xr.select.set(e.inputSource, true));
   session.addEventListener('selectend', (e) => xr.select.set(e.inputSource, false));
   session.addEventListener('visibilitychange', () => { life(`xr: ${session.visibilityState}`); onVisibility(session.visibilityState); });
-  session.addEventListener('end', () => { life('xr: session ended'); onEnd(); });
+  session.addEventListener('end', () => { life(`xr: session ended (${session.visibilityState || 'visibility unknown'})`); onEnd(); });
   if (xr.refSpace && xr.refSpace.addEventListener) {
     xr.refSpace.addEventListener('reset', (ev) => {
       const t = ev && ev.transform;

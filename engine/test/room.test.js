@@ -24,6 +24,16 @@ test('XR planes become the floor plan: x = X, y = -Z, heights above the floor', 
   assert.strictEqual(M.room.fromXR([], 0), null);
 });
 
+test('a scan that is refined (planes move by centimetres) logs its plane count once, a new count logs again', () => {
+  const hub = new Hub(), lines = [];
+  const S = new M.session.Session(hub.link('A'), {}), R = new M.room.Room(S, new AL.Space({ x: 0, y: 0, yaw: 0, z: 0 }, 0), { life: (t) => lines.push(t) });
+  R.setScan(scan());
+  for (let i = 1; i <= 20; i++) { const s = scan(); s.planes[1].p.forEach((c) => { c[1] += 0.05 * i; }); assert.strictEqual(R.setScan(s), true, 'the new geometry is kept'); }
+  assert.strictEqual(lines.filter((t) => /scan has/.test(t)).length, 1);
+  R.setScan({ planes: scan().planes.slice(0, 2) });
+  assert.strictEqual(lines.filter((t) => /scan has/.test(t)).length, 2);
+});
+
 test('support and walls: a table carries what is on it, a door frame and the ceiling do not count', () => {
   const r = scan();
   near(M.room.support(r, 1.5, 0.5, 1), 0.7, 1e-9, 'over the table, above it');

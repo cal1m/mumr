@@ -71,7 +71,9 @@
     setScan(room) {
       if (sameScan(this.own, room)) return false;
       this.own = room;
-      this._life(`room: this headset's scan has ${room ? room.planes.length : 0} planes`);
+      // (a plane that is refined while you look at it moves by more than a few centimetres every few seconds: only a new count is logged)
+      const n = room ? room.planes.length : 0;
+      if (n !== this.loggedPlanes) { this.loggedPlanes = n; this._life(`room: this headset's scan has ${n} planes`); }
       return true;
     }
     _upload(why, scan = this.own) {

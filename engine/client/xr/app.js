@@ -110,7 +110,7 @@ export async function createApp(o) {
   const room = new M.room.Room(S, space, { life, say });
   let xr = null, keeper = null;
   const sys = new SysMenu(S, lineup, {
-    exit: () => { if (xr) xr.session.end(); else say('Not in mixed reality'); },
+    exit: () => { if (xr) { life('xr: the Exit button ended the session'); xr.session.end(); } else say('Not in mixed reality'); },
     roomSetup: () => { const r = xr ? xr.roomSetup() : 'none'; say(r === 'started' ? 'Room setup: the headset takes over' : r === 'used' ? 'Room setup was used once: leave mixed reality and come back for it again' : 'No room setup here'); },
     roomUsed: () => !!(xr && xr.roomUsed),
     room, life,
