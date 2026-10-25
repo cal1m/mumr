@@ -1,6 +1,6 @@
 # Making a new MUMR app
 
-The smallest working app is [`examples/counter`](../examples/counter) (no XR). Read [ARCHITECTURE.md](ARCHITECTURE.md) first.
+The smallest working app is [`apps/counter`](../apps/counter) (no XR). Read [ARCHITECTURE.md](ARCHITECTURE.md) first.
 
 ## 1. A folder and the server
 
@@ -63,7 +63,7 @@ link.onBin = (b) => { const p = MUMR.wire.decode(b); if (p.name === 'presence') 
   `ghostColour: 'grips'`, `roomModel` (a small copy of the room in which the app's things and the viewer can be moved: see the
   cube's `app.js`; open and the full-size hand are two player settings the app's menu toggles). The room: `app.room.local()`, and
   `MUMR.room.support / ceiling / pushOut` for physics (move in steps shorter than the thing's radius and pass `from`: nothing goes
-  through a wall). `examples/cube/cube.js` uses all of it.
+  through a wall). `apps/cube/cube.js` uses all of it.
 - Every page simulates every body with **everybody's** hands, including what is derived from them (Nudgy's palm platform: the other
   player's hand had none, so a loco dropped on it fell through).
 - Requests from a page that does not hold the body: `ball.ask('place', { x, y })` in the common frame.
@@ -72,7 +72,7 @@ link.onBin = (b) => { const p = MUMR.wire.decode(b); if (p.name === 'presence') 
 ## 3b. Menus, lining up, XR
 
 The short way: `createApp` from `/mumr/xr/app.js` does all of this section (and the desktop rehearsal, the status line, giving
-bodies up while nobody looks at the page, reloading on a new build). [`examples/cube/app.js`](../examples/cube/app.js) is the whole
+bodies up while nobody looks at the page, reloading on a new build). [`apps/cube/app.js`](../apps/cube/app.js) is the whole
 cube page on it:
 
 ```js

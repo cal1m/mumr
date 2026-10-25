@@ -2,8 +2,8 @@
 // can press, other players' hands and heads, lining up on printed crosses, the hand wall. The headset page, and also the PC rehearsal:
 // the same page in a desktop browser with a pretend line-up (?frame=x,y,deg) and the mouse as a fingertip (left button on the floor;
 // right button turns the view).
-//   py -3 engine/server/serve.py examples/cube                    headsets: https://<PC>:8443/
-//   py -3 engine/server/serve.py examples/cube 8766 --http        two tabs: /?name=A&frame=0,0,0 and /?name=B&frame=1,0.5,40
+//   py -3 engine/server/serve.py apps/cube                    headsets: https://<PC>:8443/
+//   py -3 engine/server/serve.py apps/cube 8766 --http        two tabs: /?name=A&frame=0,0,0 and /?name=B&frame=1,0.5,40
 // Everything that is not the cube (the scene, the menus, the wrist menu, lining up, the hands, the desktop rehearsal) is /mumr/xr/app.js.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';

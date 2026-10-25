@@ -1,8 +1,8 @@
-// The cube demo's logic (examples/cube/cube.js): pushed by a hand, held between a thumb and a finger, falling, shared by two headsets.
+// The cube demo's logic (apps/cube/cube.js): pushed by a hand, held between a thumb and a finger, falling, shared by two headsets.
 const test = require('node:test');
 const assert = require('node:assert');
 const M = require('../client/index.js');
-const C = require('../../examples/cube/cube.js');
+const C = require('../../apps/cube/cube.js');
 const { Hub } = require('./hubfake.js');
 
 const pt = (name, x, y, z) => ({ name, x, y, z });

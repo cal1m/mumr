@@ -3,7 +3,7 @@
 // headset does. For rehearsals without headsets and for measuring the PC view.
 //   node tools/standin.js [ws://localhost:8766/ws] [name] [x,y,deg]
 const M = require('../engine/client/index.js');
-const C = require('../examples/cube/cube.js');
+const C = require('../apps/cube/cube.js');
 
 const url = process.argv[2] || 'ws://localhost:8766/ws', name = process.argv[3] || 'stand-in';
 const [fx, fy, fdeg] = (process.argv[4] || '0,0,0').split(',').map(Number);

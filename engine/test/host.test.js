@@ -6,9 +6,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const { spawn, spawnSync } = require('node:child_process');
 const M = require('../client/index.js');
-const C = require('../../examples/cube/cube.js');
+const C = require('../../apps/cube/cube.js');
 const { Hub } = require('./hubfake.js');
-const HOSTMOD = require('../../examples/cube/host.js');
+const HOSTMOD = require('../../apps/cube/host.js');
 
 function player(hub, name, frame) {
   const S = new M.session.Session(hub.link(name), HOSTMOD.session);
@@ -67,7 +67,7 @@ test('a holder that leaves gives the cube to the host, not to the next player; w
 
 test('the real server starts the host by itself, and the host keeps the cube for a player that comes later', async () => {
   const app = fs.mkdtempSync(path.join(os.tmpdir(), 'mumr-host-'));
-  for (const f of ['cube.js', 'host.js', 'index.html']) fs.copyFileSync(path.join(__dirname, '..', '..', 'examples', 'cube', f), path.join(app, f));
+  for (const f of ['cube.js', 'host.js', 'index.html']) fs.copyFileSync(path.join(__dirname, '..', '..', 'apps', 'cube', f), path.join(app, f));
   fs.writeFileSync(path.join(app, 'mumr.json'), JSON.stringify({ bodies: ['cube'], owned: { 16: 'cube' }, host: 'host.js' }));
   // (the copied host module needs the engine: it is found next to the server)
   fs.writeFileSync(path.join(app, 'cube.js'), fs.readFileSync(path.join(app, 'cube.js'), 'utf8').replace("require('../../engine/client/index.js')", `require(${JSON.stringify(path.join(__dirname, '..', 'client', 'index.js'))})`));

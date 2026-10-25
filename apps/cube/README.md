@@ -10,10 +10,10 @@ Built on 2026-10-22; run once on one Quest Pro the same day (five faults found a
 ## On two headsets
 
 ```bash
-py -3 engine/server/serve.py examples/cube
+py -3 engine/server/serve.py apps/cube
 ```
 
-1. Start the server first and check that `examples/cube/mumr-server.log` is being written (it is from the first line).
+1. Start the server first and check that `apps/cube/mumr-server.log` is being written (it is from the first line).
 2. On each headset open the `https://` address the server prints, accept the certificate once, press **Enter mixed reality**.
 3. Look at the inside of your left wrist: a small **MUMR** button sits there. Poke it with the right index finger to open the engine's
    menu (Line up, Room setup, Exit; "-" folds it again). Press **Line up**, rest an index fingertip on cross 1 and then cross 2
@@ -31,7 +31,7 @@ The log also says whether the browser offered the `shared` reference space (`xr:
 ## On the PC (rehearsal)
 
 ```bash
-py -3 engine/server/serve.py examples/cube 8766 --http --no-browser
+py -3 engine/server/serve.py apps/cube 8766 --http --no-browser
 ```
 
 Two tabs: `http://localhost:8766/?name=A&frame=0,0,0` and `http://localhost:8766/?name=B&frame=1,0.5,40` (a pretend line-up: where
