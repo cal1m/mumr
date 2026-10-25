@@ -32,7 +32,8 @@
 //   app: { THREE, scene, world, camera, S, space, presence, menus, lineup, sys, room, grips, handMask, feet, life, say, head(), xr(), bodies,
 //          ownerText(slot), gestures (this frame: everybody's hands' grab.js states), everyone (this frame: everybody's hand sources) }
 //   (app.room.local(): the room in this page's floor plan, for the app's physics: room.js support / pushOut)
-// The page needs the elements #view (canvas), #enter, #xrNote, #say, #status.
+// The page may have the elements #view (canvas), #enter, #xrNote, #say, #status (the cube's page does: its own look); without #view,
+// createApp makes the standard ones.
 import { enterXR } from './session.js';
 import { readInput, readFeet, readPlanes } from './input.js';
 import { makeGhost, GHOST_COLOURS, RADII } from './ghost.js';
@@ -51,6 +52,20 @@ export async function createApp(o) {
   const { THREE, OrbitControls } = o, M = window.MUMR, QS = new URLSearchParams(location.search), $ = (id) => document.getElementById(id);
   const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent), SysMenu = M.sysmenu.SysMenu;
   const LS = { getItem: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } }, setItem: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* not kept */ } } };
+
+  // ---- the page: a page without #view gets the standard one (a header with Enter mixed reality, the canvas, the status line)
+  if (!$('view')) {
+    const st = document.createElement('style');
+    st.textContent = 'body{margin:0;background:#14161c;color:#ece9e2;font:15px/1.5 system-ui,sans-serif}'
+      + 'header{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #39404f}'
+      + 'header h1{font-size:19px;margin:0}button{font:600 15px system-ui,sans-serif;padding:9px 14px;border-radius:8px;border:1px solid #4ea1ff;background:#4ea1ff;color:#0b0d12;cursor:pointer}'
+      + '#view{display:block;width:100%;height:calc(100vh - 160px);min-height:320px;touch-action:none}'
+      + '#status{margin:0;padding:8px 16px;color:#9aa3b2;font:12px/1.45 ui-monospace,monospace;white-space:pre-wrap;max-height:104px;overflow:auto}#say{margin-left:auto}';
+    document.head.appendChild(st);
+    document.body.insertAdjacentHTML('beforeend', `<header><h1></h1><button id="enter" hidden>Enter mixed reality</button><span id="xrNote"></span><span id="say"></span></header>`
+      + '<canvas id="view"></canvas><pre id="status"></pre>');
+    document.querySelector('header h1').textContent = document.title;
+  }
 
   // ---- the scene. `world` is the floor: inside it the floor plan (x, y, z) is THREE (x, z, -y).
   const canvas = $('view');
