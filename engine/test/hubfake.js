@@ -1,4 +1,4 @@
-// A pretend server for tests with several pretend headsets in one Node process: the part of server/hub.py that the pages see
+// A pretend server for tests with several pretend headsets in one Node process: the part of engine/server/hub.py that the pages see
 // (slots, viewers, numbered events to everybody, the kept document with key/drop/clear/scope/own/gone, ask, tokens with bodies and
 // tokens made by a claim, busy, release, motion with the slot byte written, owned packet types, the newest packets for newcomers).
 // Messages wait in a queue until flush(), so a test decides when the network delivers. net.test.js checks the real hub against the

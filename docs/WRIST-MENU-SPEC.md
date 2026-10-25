@@ -1,6 +1,6 @@
 # The wrist menu: design spec
 
-The engine's own menu (`client/sysmenu.js`, drawn by `client/xr/panel3d.js`) is the only part of MUMR a game's player sees. This is its look and its
+The engine's own menu (`engine/client/sysmenu.js`, drawn by `engine/client/xr/panel3d.js`) is the only part of MUMR a game's player sees. This is its look and its
 feel, as decided with Marek on 2026-10-22 to 2026-10-25. Nothing here is built yet: `sysmenu.js`, `menus.js` (`Poke`) and `panel3d.js` still do the
 old thing (rounded blue buttons, a press is a fingertip passing through a button, no depth, no sound).
 
@@ -84,6 +84,6 @@ Animation durations. Whether a soft thud should play when a button reaches the 2
 
 ## Building it
 
-Where the pieces would go: the press states and the held-button lock in `Poke` (`client/menus.js`), the drawing (flat card, lift, pit, whole-menu push, arrow,
-folded button) in `client/xr/panel3d.js`, the new layout in `SysMenu.layout` (`client/sysmenu.js`), the clicks in a new small client file that `panel3d.js`
+Where the pieces would go: the press states and the held-button lock in `Poke` (`engine/client/menus.js`), the drawing (flat card, lift, pit, whole-menu push, arrow,
+folded button) in `engine/client/xr/panel3d.js`, the new layout in `SysMenu.layout` (`engine/client/sysmenu.js`), the clicks in a new small client file that `panel3d.js`
 or the page calls. The menu is shared (it goes out in the `M` packet) and other players press it, so the depth state must be part of what is sent.

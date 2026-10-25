@@ -1,16 +1,16 @@
 """The MUMR server: an app's pages over https on the local network, the engine's client scripts, and the hub's WebSocket.
 
-    py -3 server/serve.py APP_FOLDER [port] [--http] [--no-browser] [--no-host] [--log=PATH|none]          default port 8443
+    py -3 engine/server/serve.py APP_FOLDER [port] [--http] [--no-browser] [--no-host] [--log=PATH|none]          default port 8443
 
 WebXR only runs on https (or localhost), so the headsets need a certificate: a self-signed one is made with openssl on the first
 run (and again when the PC's address changes) and kept in ~/.mumr/cert/ (never in a repository). Each browser warns about it once
 (Advanced -> Proceed).
 
 What is served (read-only, no directory listings, no dot-files, no .py/.pem/.bat/.log, no tests):
-    /mumr/...       the engine's client/ folder (the app loads <script src="/mumr/session.js"> and so on)
+    /mumr/...       the engine's engine/client/ folder (the app loads <script src="/mumr/session.js"> and so on)
     /...            the app's folder; / goes to the app's index page
     GET  /ws        the hub (hub.py): every headset and every PC viewer holds one WebSocket
-    POST /log       a page's life lines (client/life.js) into the server log
+    POST /log       a page's life lines (engine/client/life.js) into the server log
     GET  /info      {"build": n, "players": k, "viewers": v, "host": bool}
 
 The build stamp is the newest .js/.html in the app's folder and the engine's client folder: a page of another build is refused
@@ -18,8 +18,8 @@ when it joins, and pages can reload themselves when /info says the build changed
 
 An app configures the server with `mumr.json` in its folder (all optional):
     {"title": "Cube", "index": "index.html", "bodies": ["cube"], "owned": {"16": "cube"}, "max_peers": 4, "host": "host.js"}
-`host` names the app's host module: the server then runs `node client/host.js` with it (a process that holds the bodies nobody touches,
-client/host.js), starts it again when it ends (a new build of the pages ends it), and writes what it says into the log. --no-host: not.
+`host` names the app's host module: the server then runs `node engine/client/host.js` with it (a process that holds the bodies nobody touches,
+engine/client/host.js), starts it again when it ends (a new build of the pages ends it), and writes what it says into the log. --no-host: not.
 or calls run() from its own start script, which may also add routes: run(app, routes={"GET /networks.json": fn}) where
 fn(handler, path) answers with handler.send_json(obj) or handler.send_error(code).
 
@@ -424,7 +424,7 @@ def find_node():
 
 
 def keep_host(httpd, port):
-    """Run the app's host (client/host.js) for as long as the server runs, and start it again when it ends."""
+    """Run the app's host (engine/client/host.js) for as long as the server runs, and start it again when it ends."""
     node, slog = find_node(), httpd.slog
     if not node:
         slog("host", "node was not found: no host (install Node.js, or put node on the PATH)")

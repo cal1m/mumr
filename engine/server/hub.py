@@ -3,7 +3,7 @@ every connection is two callables that send it a text message (a dict) or a bina
 
 Three roles join (the first message, {t:'join', build, name, role}):
     player   (default) a headset: takes a slot (0 to max_peers - 1), gets events, tokens and everybody's motion
-    host     at most one: a process on the PC (client/host.js) that holds the bodies nobody touches, in slot HOST. It is not counted as a
+    host     at most one: a process on the PC (engine/client/host.js) that holds the bodies nobody touches, in slot HOST. It is not counted as a
              player (hello and 'peer' mark it host: true), it has no hands and no place to keep. Bodies go to it first: when their holder
              lets go of them (release), leaves or goes silent. A touch still takes a body from it at once (claim).
     viewer   a watcher (a PC page that shows the whole world): an id from VIEWER_BASE, not a player (no slot, not listed to the
@@ -40,7 +40,7 @@ needs no list of the app's kinds:
     own: true           the thing is OWNED by the sending connection (a player or a viewer): only it may change or drop it, others may
                         only `ask`, and when it leaves the hub sends `gone` (an event the owner supplied with it) to everyone. At most
                         MAX_OWNED owned things per connection, and at most OWN_RATE changes a second
-What an event DOES is the pages' business (client/session.js): the hub never interprets the rest of it.
+What an event DOES is the pages' business (engine/client/session.js): the hub never interprets the rest of it.
 
 Binary messages: byte 0 is the type, byte 1 becomes the sender's slot, the rest is passed on untouched to everyone else (viewers
 too). A type listed in `owned` ({type: token}) is only heard from the holder of that token: two authorities cannot both be heard.

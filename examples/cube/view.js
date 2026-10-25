@@ -80,7 +80,7 @@ function frame() {
     o.check.visible = !!p.check;
     if (p.check) o.check.position.copy(toV(p.check[0], p.check[1], (p.check[2] || 0) + 0.003));
     // that player's menus, where they float, drawn from its own state and mode (the same layouts the headsets draw): the cube's menu ('main')
-    // and the engine's menu on the wrist ('wrist', client/sysmenu.js)
+    // and the engine's menu on the wrist ('wrist', engine/client/sysmenu.js)
     const m = feed.sample('menus', p.slot), info = m ? m.data.info || {} : {};
     for (const id of ['main', 'wrist']) {
       const row = m && Array.isArray(m.data.panels) ? m.data.panels.find((r) => r[0] === id) : null;

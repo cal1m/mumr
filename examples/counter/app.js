@@ -1,5 +1,5 @@
 // The counter app: what an app gives MUMR (settings, buttons, its kinds of events) and how it listens. No XR: it runs in any browser.
-//   py -3 server/serve.py examples/counter 8766 --http      then open http://localhost:8766/ in two tabs
+//   py -3 engine/server/serve.py examples/counter 8766 --http      then open http://localhost:8766/ in two tabs
 (async function () {
   const M = window.MUMR, $ = (id) => document.getElementById(id);
   const HUES = ['tomato', 'gold', 'mediumseagreen', 'deepskyblue', 'orchid'];

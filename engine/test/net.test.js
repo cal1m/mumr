@@ -1,4 +1,4 @@
-// The real server (server/serve.py, plain http on this PC) with real links: what hubfake.js pretends, checked against hub.py.
+// The real server (engine/server/serve.py, plain http on this PC) with real links: what hubfake.js pretends, checked against hub.py.
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');

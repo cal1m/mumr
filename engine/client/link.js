@@ -1,4 +1,4 @@
-// This page's end of the WebSocket to the PC (server/serve.py, server/hub.py). It connects, says who it is,
+// This page's end of the WebSocket to the PC (engine/server/serve.py, engine/server/hub.py). It connects, says who it is,
 // keeps the connection alive, measures the round trip and comes back by itself when the Wi-Fi drops, or when the
 // other end has stopped answering without the socket saying so (a headset that was taken off and came back can find a
 // connection that the server gave up on long ago). It reports what happens to it (onNote) and why a close came
@@ -13,7 +13,7 @@
   // url: ws(s)://host/ws. opts: { build (a number, or a function that returns it), name, join (more fields for the join message:
   // { role: 'viewer' }), WebSocket (for tests), now, pingMs, deadMs, retryMs (tests), store (where the place to come back to is kept:
   // a Storage; the browser's sessionStorage by default, so that a reload comes back too; null for none) }
-  // Coming back: the hub keeps a player's place for a few seconds after its connection went (server/hub.py). The join after a drop
+  // Coming back: the hub keeps a player's place for a few seconds after its connection went (engine/server/hub.py). The join after a drop
   // says { resume: { slot, key } } from the last hello, and gets the same slot back (hello.resumed) when it is in time.
   function connect(url, opts = {}) {
     const WS = opts.WebSocket || globalThis.WebSocket;

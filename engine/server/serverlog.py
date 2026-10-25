@@ -8,7 +8,7 @@ every request and every socket, so it says what happened even then:
     page      every fetch of an .html page (who, which), and every request that failed
     ws        a socket: opened, joined, left (why, close code, how long it was up), silent, heard again, motion replaced
     token     who holds what, every change (hub.py)
-    life      the page's own life lines (client/life.js), posted to /log the moment they happen
+    life      the page's own life lines (engine/client/life.js), posted to /log the moment they happen
 
 One line each: "HH:MM:SS.mmm  kind     text". Each line is written at once (the file is opened for appending each time, so it
 can be read, moved or deleted while the server runs).

@@ -1,4 +1,4 @@
-// The PC's view of the world (client/worldfeed.js) on the pretend server, and the life log (client/life.js).
+// The PC's view of the world (engine/client/worldfeed.js) on the pretend server, and the life log (engine/client/life.js).
 const test = require('node:test');
 const assert = require('node:assert');
 const M = require('../client/index.js');

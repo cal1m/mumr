@@ -5,7 +5,7 @@
   "description": "Multi-user mixed reality for WebXR headsets: a shared world, authority by touch, a PC hub. No build step, no dependencies.",
   "scripts": {
     "test": "node --test",
-    "test:py": "py -3 -m unittest discover -s server/tests -p \"test_*.py\"",
-    "counter": "py -3 server/serve.py examples/counter 8766 --http --no-browser"
+    "test:py": "py -3 -m unittest discover -s engine/server/tests -p \"test_*.py\"",
+    "counter": "py -3 engine/server/serve.py examples/counter 8766 --http --no-browser"
   }
 }

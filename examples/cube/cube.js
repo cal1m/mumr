@@ -1,6 +1,6 @@
 // The cube demo's own logic, with no THREE and no DOM (the headset page, the PC view and the Node tests all use it):
 //   * the CUBE: a 12 cm cube on the floor. Every hand pushes it (each fingertip, the palm and every joint), except a hand that is closing
-//     on it (about to grip it, or on two sides of it). It is HELD by either grip of the engine (client/grab.js): a pinch (index and thumb
+//     on it (about to grip it, or on two sides of it). It is HELD by either grip of the engine (engine/client/grab.js): a pinch (index and thumb
 //     touching) that starts within 3 cm of it, or a fist that closes with its middle within 8 cm of it. The hold is a spring: the cube follows the hand
 //     but is stopped by whatever is in the way, and a hand that pulls more than 30 cm away (through a wall) lets go. It falls when let
 //     go, slides and slows on the floor; with a room (cube.room: room.js, this page's floor plan) it rests on tables and on solid
@@ -9,11 +9,11 @@
 //     edge. A pointing finger pushes it like any other (Marek, 2026-10-23: one finger stopped pushing it). Feet push it only with
 //     cfg.kick (off here);
 //   * its BODY adapter (MUMR body.js): the token 'cube' follows touch, the holder sends packet 16;
-//   * the MENU: the app's own (the engine's menu, with Line up, Room setup and Exit, is on the wrist: client/sysmenu.js); the same layout
+//   * the MENU: the app's own (the engine's menu, with Line up, Room setup and Exit, is on the wrist: engine/client/sysmenu.js); the same layout
 //     for this player's menu, another player's menu, and the PC view.
 // The cube is simulated on this page's floor plan (x, y on the floor, z = height of its middle above this headset's floor).
 (function (C) {
-  const M = typeof module !== 'undefined' ? require('../../client/index.js') : globalThis.MUMR;
+  const M = typeof module !== 'undefined' ? require('../../engine/client/index.js') : globalThis.MUMR;
   const SIZE = 0.12, HALF = SIZE / 2;
   const COLOURS = ['#e8a33d', '#4ea1ff', '#7bd88f', '#ff6b81', '#c792ea'];
   const DEF = { gravity: 9.81, friction: 3.0, touch: 0.012, grab: 0.03, grabFist: 0.08, spring: 20, holdSpeed: 5, breakAway: 0.3,
@@ -122,7 +122,7 @@
     step(dt, t, sources) {
       const C = this.cfg, grips = this.grips.update(sources), noHold = new Set((sources || []).filter((s) => s.noHold).map((s) => s.id));
       this.touched = false;
-      // holding: a grip of the engine (client/grab.js) that starts at the cube: a pinch within C.grab of it, a fist within C.grabFist.
+      // holding: a grip of the engine (engine/client/grab.js) that starts at the cube: a pinch within C.grab of it, a fist within C.grabFist.
       // It holds while that grip lasts (Marek: "nothing clever").
       for (const g of grips) {
         if (this.held && this.held.by === g.id && g.kind !== this.held.kind) this.held = null;
@@ -256,7 +256,7 @@
   // ---- the menu, for whoever draws it: state = that player's (session.stateOf), info = what its owner says about it (lining up ...)
   const GAME = { count: 0, colour: 0 };
   const PLAYER = { ghost: true, model: false, handIrl: false };
-  const ACTIONS = ['cubeHere'];                    // (the app's own; the engine's are client/sysmenu.js SysMenu.ACTIONS)
+  const ACTIONS = ['cubeHere'];                    // (the app's own; the engine's are engine/client/sysmenu.js SysMenu.ACTIONS)
   function press(id, st) {
     if (id === 'plus') return Object.assign({}, st, { count: st.count + 1 });
     if (id === 'colour') return Object.assign({}, st, { colour: (st.colour + 1) % COLOURS.length });

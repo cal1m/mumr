@@ -2,7 +2,7 @@
 // No sockets (it is handed a link, see link.js), no THREE and no DOM.
 //
 // Every change is an EVENT: the server numbers the events and sends each to everyone, the sender too, so all apply them in one order.
-// The server also keeps the newest event of each thing (see server/hub.py: key, drop, clear, scope, own) and gives that to everyone who
+// The server also keeps the newest event of each thing (see engine/server/hub.py: key, drop, clear, scope, own) and gives that to everyone who
 // joins, so a newcomer has the world at once. Alone (no link, or the link is down) events apply at once: one player is a session of
 // one, on the same code path.
 //
@@ -102,7 +102,7 @@
       this.tokens = {};                    // name -> slot (or null: nobody)
       this.peers = new Map();              // slot -> { name, seen (ms), stale }   (the others)
       this.clocks = new Map();             // slot -> that page's offset to the server's clock (ms)
-      this.owners = new Map();             // key -> who owns it (an owned thing of the document: server/hub.py `own`)
+      this.owners = new Map();             // key -> who owns it (an owned thing of the document: engine/server/hub.py `own`)
       const start = Object.assign({}, this.opts.game, this.opts.player, opts.mine || {});
       this.mine = {};
       for (const name of Object.keys(this.opts.player)) this.mine[name] = start[name];
@@ -207,7 +207,7 @@
       for (const name of Object.keys(this.opts.player)) if (next[name] !== cur[name]) this.setMine(name, next[name]);
       this.notify('press', id, from, next);
     }
-    // a message for whoever owns `key` (server/hub.py `ask`; the owner hears 'ask'): alone, or when it is ours, it is answered here
+    // a message for whoever owns `key` (engine/server/hub.py `ask`; the owner hears 'ask'): alone, or when it is ours, it is answered here
     request(key, m) {
       const owner = this.ownerOf(key);
       if (!this.connected || owner === this.me) { this.notify('ask', key, m, this.me); return true; }

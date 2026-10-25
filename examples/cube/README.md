@@ -10,7 +10,7 @@ Built on 2026-10-22; run once on one Quest Pro the same day (five faults found a
 ## On two headsets
 
 ```bash
-py -3 server/serve.py examples/cube
+py -3 engine/server/serve.py examples/cube
 ```
 
 1. Start the server first and check that `examples/cube/mumr-server.log` is being written (it is from the first line).
@@ -31,7 +31,7 @@ The log also says whether the browser offered the `shared` reference space (`xr:
 ## On the PC (rehearsal)
 
 ```bash
-py -3 server/serve.py examples/cube 8766 --http --no-browser
+py -3 engine/server/serve.py examples/cube 8766 --http --no-browser
 ```
 
 Two tabs: `http://localhost:8766/?name=A&frame=0,0,0` and `http://localhost:8766/?name=B&frame=1,0.5,40` (a pretend line-up: where
@@ -44,9 +44,9 @@ steps it by hand. A pretend second player without a browser: `node tools/standin
 
 | File | What |
 |---|---|
-| `cube.js` | the cube's physics, its Body adapter and packet (16), the menu layout and buttons; no THREE, tested in `test/cube.test.js` |
+| `cube.js` | the cube's physics, its Body adapter and packet (16), the menu layout and buttons; no THREE, tested in `engine/test/cube.test.js` |
 | `draw.js` | how the cube looks, for both pages |
 | `app.js`, `index.html` | the headset page (also the desktop rehearsal) |
 | `view.js`, `view.html` | the PC view (a WorldFeed watcher) |
-| `host.js` | the cube's host module: the server runs it on the PC (`client/host.js`), it holds the cube while nobody touches it |
+| `host.js` | the cube's host module: the server runs it on the PC (`engine/client/host.js`), it holds the cube while nobody touches it |
 | `mumr.json` | the server's settings: the token `cube` always has a holder, packet 16 belongs to it, the host module |

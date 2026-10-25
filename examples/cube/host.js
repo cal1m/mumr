@@ -1,4 +1,4 @@
-// The cube's host module (client/host.js runs it on the PC): the same cube as the headsets simulate, held by the host while nobody
+// The cube's host module (engine/client/host.js runs it on the PC): the same cube as the headsets simulate, held by the host while nobody
 // touches it, so it stays where it was left when everybody has gone.
 const C = require('./cube.js');
 

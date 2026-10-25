@@ -1,4 +1,4 @@
-// The packets (client/wire.js): one header for every type, the registry, presence (byte for byte Nudgy's), JSON types, the order guard.
+// The packets (engine/client/wire.js): one header for every type, the registry, presence (byte for byte Nudgy's), JSON types, the order guard.
 const test = require('node:test');
 const assert = require('node:assert');
 const M = require('../client/index.js');

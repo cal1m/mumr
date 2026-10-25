@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const M = require('../client/index.js');
-const C = require('../examples/cube/cube.js');
+const C = require('../../examples/cube/cube.js');
 const { Hub } = require('./hubfake.js');
 
 const pt = (name, x, y, z) => ({ name, x, y, z });

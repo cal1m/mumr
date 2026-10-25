@@ -25,7 +25,7 @@ One common floor frame from two touched floor spots; everything is sent in it. D
 ## Try it
 
 ```bash
-py -3 server/serve.py examples/counter 8766 --http --no-browser
+py -3 engine/server/serve.py examples/counter 8766 --http --no-browser
 ```
 
 Open `http://localhost:8766/` in two tabs. Press +1 in one and watch the other. For headsets, leave out `--http` and open the printed
@@ -34,12 +34,12 @@ Open `http://localhost:8766/` in two tabs. Press +1 in one and watch the other. 
 ## Layout
 
 ```
-server/    ws.py  hub.py  serverlog.py  serve.py        Python 3, standard library only
-client/    util link align wire session presence body worldfeed life hands follow menus anchor lineup   plain scripts, no build step
+engine/server/    ws.py  hub.py  serverlog.py  serve.py        Python 3, standard library only
+engine/client/    util link align wire session presence body worldfeed life hands follow menus anchor lineup   plain scripts, no build step
            all.js (one tag for the browser), index.js (Node)
-client/xr/ session input ghost players3d panel3d   ES modules for WebXR, THREE handed in
-test/      Node tests (hubfake.js: a pretend server for several pretend headsets in one process)
-server/tests/   Python tests
+engine/client/xr/ session input ghost players3d panel3d   ES modules for WebXR, THREE handed in
+engine/test/      Node tests (hubfake.js: a pretend server for several pretend headsets in one process)
+engine/server/tests/   Python tests
 examples/  counter (no XR), cube (the XR demo, with a PC view)
 docs/      ARCHITECTURE.md  HOWTO-NEW-APP.md  PLAN.md  NOTES.md (what was learnt, and what was streamlined)
 ```
@@ -48,10 +48,10 @@ docs/      ARCHITECTURE.md  HOWTO-NEW-APP.md  PLAN.md  NOTES.md (what was learnt
 
 ```bash
 node --test
-py -3 -m unittest discover -s server/tests -p "test_*.py"
+py -3 -m unittest discover -s engine/server/tests -p "test_*.py"
 ```
 
-`test/net.test.js` starts the real server on port 8798 (plain http, this PC only).
+`engine/test/net.test.js` starts the real server on port 8798 (plain http, this PC only).
 
 ## Rules for apps
 

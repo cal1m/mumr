@@ -1,7 +1,7 @@
 // The whole shared world as a watcher sees it: a PC page (a world view, a webcam overlay, a recorder) uses this and nothing else to
 // know what is where. No THREE and no DOM.
 //
-// It joins the server as a VIEWER (server/hub.py): not a player, it cannot change the world, except for things it OWNS (a real camera
+// It joins the server as a VIEWER (engine/server/hub.py): not a player, it cannot change the world, except for things it OWNS (a real camera
 // that the page has aligned: announce/withdraw). It gets the document and the newest packet of every kind at once, then every event
 // and every packet.
 //   * the DOCUMENT is a Session (session.js) in the viewer's role, with the app's kinds: `feed.doc` has the same shape as a player's

@@ -1,4 +1,4 @@
-// The host (server/hub.py role 'host', client/host.js, body.js giving a body back at rest): with the pretend server, then the real one.
+// The host (engine/server/hub.py role 'host', engine/client/host.js, body.js giving a body back at rest): with the pretend server, then the real one.
 const test = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
@@ -6,9 +6,9 @@ const fs = require('node:fs');
 const os = require('node:os');
 const { spawn, spawnSync } = require('node:child_process');
 const M = require('../client/index.js');
-const C = require('../examples/cube/cube.js');
+const C = require('../../examples/cube/cube.js');
 const { Hub } = require('./hubfake.js');
-const HOSTMOD = require('../examples/cube/host.js');
+const HOSTMOD = require('../../examples/cube/host.js');
 
 function player(hub, name, frame) {
   const S = new M.session.Session(hub.link(name), HOSTMOD.session);
@@ -67,10 +67,10 @@ test('a holder that leaves gives the cube to the host, not to the next player; w
 
 test('the real server starts the host by itself, and the host keeps the cube for a player that comes later', async () => {
   const app = fs.mkdtempSync(path.join(os.tmpdir(), 'mumr-host-'));
-  for (const f of ['cube.js', 'host.js', 'index.html']) fs.copyFileSync(path.join(__dirname, '..', 'examples', 'cube', f), path.join(app, f));
+  for (const f of ['cube.js', 'host.js', 'index.html']) fs.copyFileSync(path.join(__dirname, '..', '..', 'examples', 'cube', f), path.join(app, f));
   fs.writeFileSync(path.join(app, 'mumr.json'), JSON.stringify({ bodies: ['cube'], owned: { 16: 'cube' }, host: 'host.js' }));
   // (the copied host module needs the engine: it is found next to the server)
-  fs.writeFileSync(path.join(app, 'cube.js'), fs.readFileSync(path.join(app, 'cube.js'), 'utf8').replace("require('../../client/index.js')", `require(${JSON.stringify(path.join(__dirname, '..', 'client', 'index.js'))})`));
+  fs.writeFileSync(path.join(app, 'cube.js'), fs.readFileSync(path.join(app, 'cube.js'), 'utf8').replace("require('../../engine/client/index.js')", `require(${JSON.stringify(path.join(__dirname, '..', 'client', 'index.js'))})`));
   const PORT = 8797, server = spawn('py', ['-3', path.join(__dirname, '..', 'server', 'serve.py'), app, String(PORT), '--http', '--no-browser', '--log=none'], { stdio: 'ignore' });
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   try {

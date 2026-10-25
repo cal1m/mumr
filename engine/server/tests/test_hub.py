@@ -1,6 +1,6 @@
-"""The hub (server/hub.py): slots and the version check, the self-describing document, owned things, tokens, motion.
+"""The hub (engine/server/hub.py): slots and the version check, the self-describing document, owned things, tokens, motion.
 
-    py -3 -m unittest discover -s server/tests -p "test_*.py"
+    py -3 -m unittest discover -s engine/server/tests -p "test_*.py"
 """
 import os
 import sys

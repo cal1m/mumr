@@ -125,8 +125,8 @@ link). Check that `mumr-server.log` grows **before** anyone puts a headset on.
 
 ## 7. Testing
 
-1. Logic in plain scripts (no THREE, no DOM), tested in Node with two pretend headsets: `test/hubfake.js` (`hub.link('A')`,
-   `hub.flush()`). See `test/session.test.js` and `test/body.test.js`.
+1. Logic in plain scripts (no THREE, no DOM), tested in Node with two pretend headsets: `engine/test/hubfake.js` (`hub.link('A')`,
+   `hub.flush()`). See `engine/test/session.test.js` and `engine/test/body.test.js`.
 2. Two browser tabs on the PC (`--http`), each with a pretend line-up.
 3. Two headsets, with the server (and its log) started first. Before reporting a two-headset fault, check in the log that both headsets
    fetched the page after the last change.

@@ -1,10 +1,10 @@
-// The HOST: a Node process on the PC that holds the bodies nobody touches (server/hub.py role 'host'). It runs the app's own plain
+// The HOST: a Node process on the PC that holds the bodies nobody touches (engine/server/hub.py role 'host'). It runs the app's own plain
 // simulation (the same file the headsets run) with everybody's hands, in the common frame, and sends the state while it holds a body. A
 // touch takes a body from it at once; a body at rest that nobody touches comes back to it (body.js). The world keeps going, and stays
 // where it was left, when every headset has gone.
 //
-//   node client/host.js <ws(s)://host:port/ws> <the app's host module>
-// The server starts it by itself when the app's mumr.json says { "host": "host.js" } (server/serve.py), and starts it again when it ends.
+//   node engine/client/host.js <ws(s)://host:port/ws> <the app's host module>
+// The server starts it by itself when the app's mumr.json says { "host": "host.js" } (engine/server/serve.py), and starts it again when it ends.
 // It ends when the pages' build changes (so that it runs the new code) or when the server refuses it.
 //
 // The app's host module exports:
@@ -16,7 +16,7 @@ const path = require('node:path');
 const M = require('./index.js');
 
 const [url, modPath] = process.argv.slice(2);
-if (!url || !modPath) { console.error('usage: node client/host.js <ws url> <host module>'); process.exit(2); }
+if (!url || !modPath) { console.error('usage: node engine/client/host.js <ws url> <host module>'); process.exit(2); }
 const http = url.replace(/^ws/, 'http').replace(/\/ws$/, '');
 const app = require(path.resolve(modPath));
 

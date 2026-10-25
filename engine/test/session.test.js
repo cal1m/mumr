@@ -1,4 +1,4 @@
-// The shared document (client/session.js) with pretend headsets on a pretend server (hubfake.js).
+// The shared document (engine/client/session.js) with pretend headsets on a pretend server (hubfake.js).
 const test = require('node:test');
 const assert = require('node:assert');
 const M = require('../client/index.js');

@@ -46,31 +46,31 @@ NOTES 1, 2026-10-22).
 
 | File | What it does | Depends on |
 |---|---|---|
-| `server/ws.py` | WebSocket frames (RFC 6455), standard library | - |
-| `server/hub.py` | roles (player 0-3, viewer 100+), version check, numbered events, the kept document (`key/drop/clear/scope/own/gone`), `ask`, tokens (`bodies` and tokens made by a claim; busy, release, silence), motion with the slot byte written by the hub and owned types checked, newest packets for newcomers, `Outbox` | - |
-| `server/serverlog.py` | the always-on log: pages fetched, sockets (why they ended), tokens, the pages' life lines | - |
-| `server/serve.py` | https with a self-signed certificate (`~/.mumr/cert`), the app's folder and `/mumr/`, `/ws`, `/log`, `/info`, build stamp, the app's routes, `mumr.json` | hub, ws, serverlog |
-| `client/util.js` | `num`, `wrap`, `clone`, `Emitter` | - |
-| `client/link.js` | the WebSocket: join, reconnect with back-off, watchdog (4 s, ignoring a paused page), ping and round trip, the server's clock, close codes | - |
-| `client/align.js` | frames, `Space`, `Aligner` (the line-up with knobs, locks, save/load against an anchor, `rebase`), `Resets` | - |
-| `client/wire.js` | the packet registry, the common header, presence (`P`), JSON types (`M`), `Guard` | - |
-| `client/session.js` | the Document: kinds, built-in settings/players/frame/check/do, press routing, owned things and `request`, tokens, keyframes, pending own changes | util, link (handed in) |
-| `client/presence.js` | head and hands out (common frame) and in (own frame), everybody's hands for the simulation | session, wire, align |
-| `client/body.js` | a Body: claim on reach, busy while touching, send at a rate (slow when still), take only the holder's, `ask`/`do`, keyframes; policies `touch` and `owner` | session, wire |
-| `client/worldfeed.js` | a viewer: the document (a Session) plus every stream by server time, interpolated | session, wire, link |
-| `client/life.js` | the page's life log: numbered lines to `/log` at once (keepalive), resent, last lines in sessionStorage | - |
-| `client/hands.js` | a hand's 25 joints as a source on the floor plan, the pinch (select event, or tips < 22 mm, let go at 35 mm), fingertips for the line-up | - |
-| `client/follow.js` | where this player's menu floats: it stays while you are near and follows you on a lead when you walk away | - |
-| `client/menus.js` | menu layouts (`grid`), the hit test, panel axes, `Poke` (a fingertip through a button from the front), `Menus` (everyone's panel poses and info through `M`) | session, wire, align |
-| `client/anchor.js` | `Keeper`: the persistent anchor, reset events, settle, found again by its handle (the 10-22 fix) | util, align |
-| `client/lineup.js` | `LineUp`: Aligner + keeper + session + saving, its buttons (`lineUp`, `p1create` ...), rows and info for the menu, marks to draw | align, session, anchor |
-| `client/room.js` | the room: a headset's planes on its floor plan, the server's room in the common frame (uploaded once by the first headset when the server has none, or by the Upload button); `kind` (table, solid, wall ...), `support`, `ceiling` and `pushOut` for an app's physics | session, align |
-| `client/grab.js` | the gestures of a hand, for any app: a pinch and a fist (grips), pointing (a ray, and what it hits: `pointAt`), a flat hand as a platform (palm up or down), from anybody's hand sources | hands, room |
-| `client/model.js` | the room model: a small copy of the room to move things in (scale, the way between the room and the model, its handles, this page's hands at every open model) | grab, util |
-| `client/sysmenu.js` | the engine's own menu on the inside of the left wrist (folded: a wrist button; open: Line up with its spot rows, Room setup, Exit), shared like every menu (panel `wrist`, state in the menus' info.sys) | lineup, menus, follow |
-| `client/host.js` | the host process (Node): the app's own simulation on the PC, holding what nobody touches | everything plain |
-| `client/all.js` | the browser's one-tag loader for all of the above | - |
-| `client/xr/*.js` | ES modules, THREE handed in: `session.js` (enter MR, resets, the `shared` probe, the anchor's XR calls), `input.js` (hands and controllers from the frame), `ghost.js` (ghost fingers), `players3d.js` (the others' hands, heads and feet, line-up marks and knobs), `panel3d.js` (a menu panel drawn from a grid), `room3d.js` (the room's outlines), `feet3d.js` (shoes), `handmask.js` (the hand cutouts), `handwall.js` (the hand window on a wall), `pointer3d.js` (pointing rays), `roommodel3d.js` (the room model), `app.js` (createApp) | the plain files |
+| `engine/server/ws.py` | WebSocket frames (RFC 6455), standard library | - |
+| `engine/server/hub.py` | roles (player 0-3, viewer 100+), version check, numbered events, the kept document (`key/drop/clear/scope/own/gone`), `ask`, tokens (`bodies` and tokens made by a claim; busy, release, silence), motion with the slot byte written by the hub and owned types checked, newest packets for newcomers, `Outbox` | - |
+| `engine/server/serverlog.py` | the always-on log: pages fetched, sockets (why they ended), tokens, the pages' life lines | - |
+| `engine/server/serve.py` | https with a self-signed certificate (`~/.mumr/cert`), the app's folder and `/mumr/`, `/ws`, `/log`, `/info`, build stamp, the app's routes, `mumr.json` | hub, ws, serverlog |
+| `engine/client/util.js` | `num`, `wrap`, `clone`, `Emitter` | - |
+| `engine/client/link.js` | the WebSocket: join, reconnect with back-off, watchdog (4 s, ignoring a paused page), ping and round trip, the server's clock, close codes | - |
+| `engine/client/align.js` | frames, `Space`, `Aligner` (the line-up with knobs, locks, save/load against an anchor, `rebase`), `Resets` | - |
+| `engine/client/wire.js` | the packet registry, the common header, presence (`P`), JSON types (`M`), `Guard` | - |
+| `engine/client/session.js` | the Document: kinds, built-in settings/players/frame/check/do, press routing, owned things and `request`, tokens, keyframes, pending own changes | util, link (handed in) |
+| `engine/client/presence.js` | head and hands out (common frame) and in (own frame), everybody's hands for the simulation | session, wire, align |
+| `engine/client/body.js` | a Body: claim on reach, busy while touching, send at a rate (slow when still), take only the holder's, `ask`/`do`, keyframes; policies `touch` and `owner` | session, wire |
+| `engine/client/worldfeed.js` | a viewer: the document (a Session) plus every stream by server time, interpolated | session, wire, link |
+| `engine/client/life.js` | the page's life log: numbered lines to `/log` at once (keepalive), resent, last lines in sessionStorage | - |
+| `engine/client/hands.js` | a hand's 25 joints as a source on the floor plan, the pinch (select event, or tips < 22 mm, let go at 35 mm), fingertips for the line-up | - |
+| `engine/client/follow.js` | where this player's menu floats: it stays while you are near and follows you on a lead when you walk away | - |
+| `engine/client/menus.js` | menu layouts (`grid`), the hit test, panel axes, `Poke` (a fingertip through a button from the front), `Menus` (everyone's panel poses and info through `M`) | session, wire, align |
+| `engine/client/anchor.js` | `Keeper`: the persistent anchor, reset events, settle, found again by its handle (the 10-22 fix) | util, align |
+| `engine/client/lineup.js` | `LineUp`: Aligner + keeper + session + saving, its buttons (`lineUp`, `p1create` ...), rows and info for the menu, marks to draw | align, session, anchor |
+| `engine/client/room.js` | the room: a headset's planes on its floor plan, the server's room in the common frame (uploaded once by the first headset when the server has none, or by the Upload button); `kind` (table, solid, wall ...), `support`, `ceiling` and `pushOut` for an app's physics | session, align |
+| `engine/client/grab.js` | the gestures of a hand, for any app: a pinch and a fist (grips), pointing (a ray, and what it hits: `pointAt`), a flat hand as a platform (palm up or down), from anybody's hand sources | hands, room |
+| `engine/client/model.js` | the room model: a small copy of the room to move things in (scale, the way between the room and the model, its handles, this page's hands at every open model) | grab, util |
+| `engine/client/sysmenu.js` | the engine's own menu on the inside of the left wrist (folded: a wrist button; open: Line up with its spot rows, Room setup, Exit), shared like every menu (panel `wrist`, state in the menus' info.sys) | lineup, menus, follow |
+| `engine/client/host.js` | the host process (Node): the app's own simulation on the PC, holding what nobody touches | everything plain |
+| `engine/client/all.js` | the browser's one-tag loader for all of the above | - |
+| `engine/client/xr/*.js` | ES modules, THREE handed in: `session.js` (enter MR, resets, the `shared` probe, the anchor's XR calls), `input.js` (hands and controllers from the frame), `ghost.js` (ghost fingers), `players3d.js` (the others' hands, heads and feet, line-up marks and knobs), `panel3d.js` (a menu panel drawn from a grid), `room3d.js` (the room's outlines), `feet3d.js` (shoes), `handmask.js` (the hand cutouts), `handwall.js` (the hand window on a wall), `pointer3d.js` (pointing rays), `roommodel3d.js` (the room model), `app.js` (createApp) | the plain files |
 
 ## 4. The packets
 
@@ -103,7 +103,7 @@ it simulates locally with everybody's hands from the frame it touches, and the h
 
 ## 6a. The host
 
-An app may have a host (`mumr.json` `"host": "host.js"`): the server starts `node client/host.js` with the app's host module and starts
+An app may have a host (`mumr.json` `"host": "host.js"`): the server starts `node engine/client/host.js` with the app's host module and starts
 it again when it ends. The host joins in slot 15 with role `host`: not a player (not counted, no hands, no menu, marked `host` in hello and
 `peer`), lined up by being the common frame. It runs the app's own plain simulation with everybody's hands. Bodies go to it first: when
 their holder releases them (a body at rest that nobody of that page touches is released after 0.6 s), leaves or goes silent. A touch
@@ -125,4 +125,4 @@ the old connection (that one is closed). A page that closes on purpose sends `by
 5. Alone, the same code path.
 6. A page of another build is refused (and reloads itself): a headset running an old page explains most "half of it works" reports.
 7. Logging runs all the time and does not depend on the frame loop.
-8. Test with two pretend headsets in Node (`test/hubfake.js`), then two tabs, then two headsets with the server log running first.
+8. Test with two pretend headsets in Node (`engine/test/hubfake.js`), then two tabs, then two headsets with the server log running first.

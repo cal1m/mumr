@@ -1,4 +1,4 @@
-"""The server (server/serve.py) over plain http on this PC: what it serves and refuses, /info, /log, the app's routes, the log file."""
+"""The server (engine/server/serve.py) over plain http on this PC: what it serves and refuses, /info, /log, the app's routes, the log file."""
 import json
 import os
 import sys

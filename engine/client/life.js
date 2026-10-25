@@ -1,5 +1,5 @@
 // A page's LIFE LOG: one numbered line for each thing that happens to the page itself (it entered mixed reality, it was hidden, the
-// tracking was reset, the socket closed and why). Each line goes to the server's log (server/serverlog.py, POST /log) the moment it is
+// tracking was reset, the socket closed and why). Each line goes to the server's log (engine/server/serverlog.py, POST /log) the moment it is
 // written, with `keepalive`, so that it gets there even when the page is being hidden or closed; a post that failed is sent again with
 // the next one (the server skips numbers it has). The last lines are also kept in sessionStorage, so a page that reloads shows what
 // happened before. No THREE and no DOM (fetch and storage are handed in, or taken from the browser).

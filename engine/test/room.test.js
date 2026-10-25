@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const M = require('../client/index.js');
-const C = require('../examples/cube/cube.js');
+const C = require('../../examples/cube/cube.js');
 const { Hub } = require('./hubfake.js');
 const AL = M.align;
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg || ''} ${a} vs ${b}`);

@@ -1,4 +1,4 @@
-"""WebSocket frames (server/ws.py). From Nudgy's test_ws.py."""
+"""WebSocket frames (engine/server/ws.py). From Nudgy's test_ws.py."""
 import io
 import os
 import struct

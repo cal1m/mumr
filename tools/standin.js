@@ -2,7 +2,7 @@
 // each) round a circle, holds the cube's token when it is the first one in and sends the cube, and sends its menu, at the rates a
 // headset does. For rehearsals without headsets and for measuring the PC view.
 //   node tools/standin.js [ws://localhost:8766/ws] [name] [x,y,deg]
-const M = require('../client/index.js');
+const M = require('../engine/client/index.js');
 const C = require('../examples/cube/cube.js');
 
 const url = process.argv[2] || 'ws://localhost:8766/ws', name = process.argv[3] || 'stand-in';
