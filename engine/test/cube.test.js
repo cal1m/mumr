@@ -87,8 +87,22 @@ test('the cube menu has only the cube’s items; the engine items are on the wri
   const ids = (l) => l.buttons.filter((q) => q.id).map((q) => q.id);
   assert.deepStrictEqual(ids(SM.layout({ open: false })), ['sysOpen'], 'folded: one wrist button');
   assert.deepStrictEqual(ids(SM.layout({ open: true, lined: true, dist: 3.34 })), ['sysClose', 'lineUp', 'roomSetup', 'exit']);
-  assert.deepStrictEqual(ids(SM.layout({ open: true, lining: true, fields: [{ placed: true }, {}, {}] })), ['sysClose', 'lineUp', 'p1create', 'p1delete', 'p1lock', 'p2create', 'p2delete', 'p2lock', 'p3create', 'p3delete', 'p3lock', 'supplyRoom']);
+  assert.deepStrictEqual(ids(SM.layout({ open: true, lining: true, fields: [{ placed: true }, {}, {}] })), ['sysClose', 'spot1', 'spot2', 'lineUp'], 'a thing that cannot be pressed now (the check spot, a room to upload) is text');
+  assert.deepStrictEqual(ids(SM.layout({ open: true, lining: true, lined: true, fields: [{ placed: true }, { placed: true }, {}], room: { own: 14, kept: false } })), ['sysClose', 'spot1', 'spot2', 'spot3', 'supplyRoom', 'lineUp']);
+  assert.deepStrictEqual(ids(SM.layout({ open: true, lining: true, spot: 0, fields: [{ placed: true }, {}, {}] })), ['sysClose', 'spotLock', 'spotReplace', 'spotDelete', 'spotBack']);
+  assert.deepStrictEqual(ids(SM.layout({ open: true, lining: true, spot: 1, fields: [{ placed: true }, {}, {}] })), ['sysClose', 'spotReplace', 'spotBack'], 'an empty spot: nothing to lock or delete');
+  assert.deepStrictEqual(ids(SM.layout({ open: true, asking: true })), ['sysClose', 'exitYes', 'exitNo']);
   assert.ok(SM.width({ open: true }) > SM.width({ open: false }) * 3);
+  const lv = (i) => SM.layout(Object.assign({ open: true, fields: [{}, {}, {}] }, i)).level;
+  assert.deepStrictEqual([lv({}), lv({ lining: true }), lv({ asking: true }), lv({ lining: true, spot: 1 })], [0, 1, 1, 2], 'how deep a screen is: it slides in from the right, back slides out to the left');
+  // the spec's sizes: the card 22 cm wide, buttons at least 4 x 3 cm, 8 mm between them, the fold arrow and the folded button 2 x 2 cm
+  const home = SM.layout({ open: true, lined: true }), cm = home.w / 22, btn = home.buttons.filter((q) => q.id && q.id !== 'sysClose');
+  assert.ok(btn.every((q) => q.w / cm >= 4 && Math.abs(q.h / cm - 3) < 1e-9), 'buttons are at least 4 x 3 cm');
+  const [a, b, c] = [home.buttons.find((q) => q.id === 'lineUp'), home.buttons.find((q) => q.id === 'roomSetup'), home.buttons.find((q) => q.id === 'exit')];
+  assert.ok(Math.abs((b.x - a.x - a.w) / cm - 0.8) < 1e-9 && Math.abs((c.y - a.y - a.h) / cm - 1.6 - 3) < 1e-9, '8 mm between buttons and between rows');
+  const arrow = home.buttons.find((q) => q.id === 'sysClose');
+  assert.ok(Math.abs(arrow.w / cm - 2) < 1e-9 && Math.abs((home.card.y - arrow.y - arrow.h) / cm - 0.8) < 1e-9, 'the arrow is 2 x 2 cm, 8 mm above the card');
+  assert.ok(Math.abs(SM.layout({ open: false }).buttons[0].w / cm - 2 * 22 / 22) < 1e-9 && Math.abs(SM.width({ open: false }) - 0.02) < 1e-9, 'the folded button is 2 x 2 cm');
 });
 
 test('the wrist menu: its buttons act at its owner, Line up opens it, and it shows while the inside of the left wrist looks at you', () => {
@@ -97,8 +111,16 @@ test('the wrist menu: its buttons act at its owner, Line up opens it, and it sho
   assert.deepStrictEqual([sys.press('sysOpen'), sys.open, sys.press('sysClose'), sys.open], [true, true, true, false]);
   sys.press('lineUp');
   assert.deepStrictEqual([L.active, sys.open, sys.info().lining], [true, true, true], 'lining up opens it, so that the fields are seen');
-  sys.press('exit'); sys.press('roomSetup');
+  sys.press('exit');
+  assert.deepStrictEqual([done, sys.info().asking], [[], true], 'Exit asks again first');
+  sys.press('exitNo'); sys.press('exit'); sys.press('exitYes'); sys.press('roomSetup');
   assert.deepStrictEqual(done, ['exit', 'room']);
+  // poking a spot opens its menu, whose buttons act on that spot; Done closes it with lining up
+  sys.press('spot2'); assert.strictEqual(sys.info().spot, 1);
+  assert.ok(sys.press('spotReplace') && L.aligner.fields()[1].armed, 'Replace/Create on spot 2 arms spot 2');
+  sys.press('spotBack'); assert.strictEqual(sys.info().spot, null);
+  sys.press('spot3'); sys.press('lineUp'); assert.deepStrictEqual([L.active, sys.info().spot], [false, null]);
+  sys.press('lineUp'); sys.press('sysClose'); assert.deepStrictEqual([sys.open, sys.info().spot, sys.info().asking], [false, null, false]);
   assert.strictEqual(sys.press('plus'), false, 'not one of the engine’s');
   // a left hand held up in front of the eyes (1.6 m), palm side towards them: wrist joints in XR space
   const jp = new Float32Array(75), set = (i, x, y, z) => { jp[i * 3] = x; jp[i * 3 + 1] = y; jp[i * 3 + 2] = z; };

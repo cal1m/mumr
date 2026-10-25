@@ -7,7 +7,8 @@
 //   hit(lay, u, v)       the button at (u, v) (0..1 from the top left), or null
 //   axes(pose)           a panel pose { x, y (floor plan), h (XR height), yaw (the way it faces), pitch (how far it leans back) } as XR
 //                        vectors: pos, right, up, normal (out of its front) and ry (its turn about XR Y). THREE uses the same numbers.
-//   Poke                 fingertips through panels -> presses, hover, and which panels have a hand at them
+//   shape(held, d)       how far a button is down and the menu pushed back, for a fingertip d metres past the surface
+//   Poke                 fingertips through panels -> presses, releases, which buttons are touched (and how deep), and which panels have a hand at them
 //   Menus                this page's panels out (the `M` packet, ten a second, common frame) and the other players' in
 (function (M) {
   const PAD = 14, TITLE_H = 60, ROW_H = 96;
@@ -56,37 +57,82 @@
   }
   const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
-  // Fingertips through panels. A press is a tip that was more than 4 mm in front of a button and is now at or behind its surface,
-  // within 8 cm of it (so a hand that comes round from behind presses nothing: from behind a menu is a blank wall). One press in 400 ms.
+  // How deep a button is pressed and how far the whole menu gives way, for a fingertip `d` metres past the menu surface (negative: in front of
+  // it). Rigid blocks only (docs/WRIST-MENU-SPEC.md, "A press"): near, a button stands up 4 mm; held (pressed at 1 cm), it is down 1 cm at least,
+  // follows the fingertip to 2.5 cm and stops there; each extra cm of push moves the whole menu back 1 mm. -> { top, push } in metres (top: the
+  // button's face along the menu normal, + out of the surface; push: the menu moved back)
+  const LIFT = 0.004, PRESS = 0.01, LIMIT = 0.025, PUSH_PER = 0.1;
+  function shape(held, d) {
+    if (!held) return { top: LIFT, push: 0 };
+    return { top: -Math.min(LIMIT, Math.max(PRESS, d)), push: Math.max(0, d - LIMIT) * PUSH_PER };
+  }
+
+  // Where a button's middle is in XR space and how big it is (cm²), for a panel { pose, w, h, lay }: where its click comes from
+  function buttonAt(pn, id) {
+    const b = pn.lay.buttons.find((x) => x.id === id);
+    if (!b) return null;
+    const A = axes(pn.pose), lx = ((b.x + b.w / 2) / pn.lay.w - 0.5) * pn.w, ly = (0.5 - (b.y + b.h / 2) / pn.lay.h) * pn.h;
+    return { pos: [0, 1, 2].map((i) => A.pos[i] + A.right[i] * lx + A.up[i] * ly), cm2: (b.w * pn.w / pn.lay.w * 100) * (b.h * pn.h / pn.lay.h * 100) };
+  }
+
+  // Fingertips through panels (docs/WRIST-MENU-SPEC.md, "A press"). A button is armed by a tip above it, in front of the menu and within 6 cm; the
+  // press is that tip reaching 1 cm into the surface over the same button, once, on the way down. The button stays held (no other button can be
+  // pressed, by any hand) until the tip is back up at the surface, or 7 cm to the side of it: then it lets go and activates nothing. A tip that
+  // comes in from the side or from behind arms nothing, and neither does coming back after letting go.
   class Poke {
-    constructor(cfg = {}) { this.cfg = Object.assign({ front: 0.004, depth: 0.08, hover: 0.06, busy: 0.25, gap: 400 }, cfg); this.was = new Map(); this.pressedAt = -1e9; }
+    constructor(cfg = {}) { this.cfg = Object.assign({ depth: 0.08, hover: 0.06, busy: 0.25, press: PRESS, side: 0.07, through: 0.5 }, cfg); this.tips = new Map(); }
     // panels: [{ key, owner, id, pose, w, h (metres), lay, ignore (a tip id that does not press it) }]; tips: [{ id, p: [x, y, z] (XR) }];
-    // -> { presses, hover, busy (keys with a hand within 25 cm: a menu must not glide away from under it), at (keys with a fingertip at
-    //    the card itself: within 5 cm of its face and over it, someone is using it) }
+    // -> { presses, releases, hover, touches, busy (keys with a hand within 25 cm: a menu must not glide away from under it), at (keys with a
+    //    fingertip at the card itself: within 5 cm of its face and over it, someone is using it) }
+    //    presses / releases: [{ key, owner, panel, button, tip }] (a release only after a press; presses also have u, v)
+    //    touches: [{ key, owner, panel, button, held, d (m past the surface), tip }] one per tip that is at a button now (near or held)
     update(panels, tips, nowMs) {
-      const C = this.cfg, out = { presses: [], hover: null, busy: new Set(), at: new Set() };
-      const seen = new Set();
-      for (const pn of panels) {
-        const A = axes(pn.pose);
-        for (const t of tips) {
+      const C = this.cfg, out = { presses: [], releases: [], hover: null, touches: [], busy: new Set(), at: new Set() };
+      const byKey = new Map(), live = new Set(tips.map((t) => t.id));
+      for (const pn of panels) byKey.set(pn.key, Object.assign({ A: axes(pn.pose) }, pn));
+      const local = (pn, t) => { const d = sub(t.p, pn.A.pos); return { lx: dot(d, pn.A.right), ly: dot(d, pn.A.up), lz: dot(d, pn.A.normal) }; };
+      const heldNow = () => { for (const s of this.tips.values()) if (s.held) return s.held; return null; };
+      for (const t of tips) {
+        const st = this.tips.get(t.id) || { armed: null, held: null }; this.tips.set(t.id, st);
+        for (const pn of byKey.values()) {
           if (pn.ignore && pn.ignore === t.id) continue;          // (a menu on a wrist is not pressed by the fingers of that hand)
-          const d = sub(t.p, A.pos), lx = dot(d, A.right), ly = dot(d, A.up), lz = dot(d, A.normal), k = `${pn.key}|${t.id}`;
-          seen.add(k);
-          const u = lx / pn.w + 0.5, v = 0.5 - ly / pn.h, inside = Math.abs(lx) <= pn.w / 2 && Math.abs(ly) <= pn.h / 2;
-          if (Math.abs(lz) < C.busy && Math.abs(lx) < pn.w / 2 + 0.15 && Math.abs(ly) < pn.h / 2 + 0.15) out.busy.add(pn.key);
-          if (Math.abs(lz) < 0.05 && Math.abs(lx) < pn.w / 2 + 0.02 && Math.abs(ly) < pn.h / 2 + 0.02) out.at.add(pn.key);
-          const id = inside && Math.abs(lz) < C.depth ? hit(pn.lay, u, v) : null, was = this.was.get(k);
-          if (id) {
-            if (lz > 0 && lz < C.hover) out.hover = { key: pn.key, owner: pn.owner, button: id };
-            if (was !== undefined && was > C.front && lz <= C.front && nowMs - this.pressedAt > C.gap) {
-              this.pressedAt = nowMs;
-              out.presses.push({ key: pn.key, owner: pn.owner, panel: pn.id, button: id, u, v, tip: t.id });
-            }
-          }
-          this.was.set(k, lz);
+          const q = local(pn, t);
+          if (Math.abs(q.lz) < C.busy && Math.abs(q.lx) < pn.w / 2 + 0.15 && Math.abs(q.ly) < pn.h / 2 + 0.15) out.busy.add(pn.key);
+          if (Math.abs(q.lz) < 0.05 && Math.abs(q.lx) < pn.w / 2 + 0.02 && Math.abs(q.ly) < pn.h / 2 + 0.02) out.at.add(pn.key);
         }
+        const rec = (h) => ({ key: h.key, owner: h.owner, panel: h.panel, button: h.button, tip: t.id });
+        if (st.held) {                                              // a button is held by this tip: it stays until the tip is up again or aside
+          const h = st.held, pn = byKey.get(h.key), b = pn && pn.lay.buttons.find((x) => x.id === h.button);
+          const q = pn && b ? local(pn, t) : null, d = q ? -q.lz : 0;
+          let gone = !q || q.lz >= 0 || d > C.through;
+          if (q) {
+            const kx = pn.w / pn.lay.w, ky = pn.h / pn.lay.h, cx = (b.x + b.w / 2) * kx - pn.w / 2, cy = pn.h / 2 - (b.y + b.h / 2) * ky;
+            gone = gone || Math.hypot(Math.max(0, Math.abs(q.lx - cx) - b.w * kx / 2), Math.max(0, Math.abs(q.ly - cy) - b.h * ky / 2)) > C.side;
+          }
+          if (gone) { out.releases.push(rec(h)); st.held = null; st.armed = null; } else { out.touches.push(Object.assign(rec(h), { held: true, d })); continue; }
+        }
+        let best = null;                                            // the button under the tip: of the nearest panel
+        for (const pn of byKey.values()) {
+          if (pn.ignore && pn.ignore === t.id) continue;
+          const q = local(pn, t);
+          if (Math.abs(q.lx) > pn.w / 2 || Math.abs(q.ly) > pn.h / 2 || q.lz > C.hover || q.lz < -C.depth) continue;
+          const u = q.lx / pn.w + 0.5, v = 0.5 - q.ly / pn.h, id = hit(pn.lay, u, v);
+          if (id && (!best || Math.abs(q.lz) < Math.abs(best.lz))) best = { pn, id, u, v, lz: q.lz };
+        }
+        if (!best) { st.armed = null; continue; }
+        const { pn, id } = best, same = st.armed && st.armed.key === pn.key && st.armed.button === id, other = heldNow();
+        if (best.lz > 0) st.armed = { key: pn.key, button: id };
+        else if (!same) continue;                                   // (in from the side or from behind: nothing)
+        const tc = { key: pn.key, owner: pn.owner, panel: pn.id, button: id, held: false, d: -best.lz, tip: t.id };
+        if (other) { st.armed = null; continue; }                   // (another button is held: this one does nothing)
+        if (-best.lz >= C.press) {
+          st.held = { key: pn.key, owner: pn.owner, panel: pn.id, button: id }; st.armed = null; tc.held = true;
+          out.presses.push({ key: pn.key, owner: pn.owner, panel: pn.id, button: id, u: best.u, v: best.v, tip: t.id });
+        }
+        out.touches.push(tc);
+        if (!out.hover) out.hover = { key: pn.key, owner: pn.owner, button: id };
       }
-      for (const k of [...this.was.keys()]) if (!seen.has(k)) this.was.delete(k);
+      for (const [k, st] of [...this.tips]) if (!live.has(k)) { if (st.held) out.releases.push({ key: st.held.key, owner: st.held.owner, panel: st.held.panel, button: st.held.button, tip: k }); this.tips.delete(k); }
       return out;
     }
   }
@@ -149,5 +195,5 @@
     }
   }
 
-  M.menus = { grid, hit, axes, handleDist, Poke, Menus, TITLE_H, PAD };
+  M.menus = { grid, hit, axes, handleDist, shape, buttonAt, Poke, Menus, TITLE_H, PAD, LIFT, PRESS, LIMIT };
 })(typeof module !== 'undefined' ? (module.exports = require('./ns.js')) : (globalThis.MUMR = globalThis.MUMR || {}));

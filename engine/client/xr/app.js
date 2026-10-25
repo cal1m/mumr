@@ -122,6 +122,7 @@ export async function createApp(o) {
     room, life,
   });
   const bodies = (typeof o.bodies === 'function' ? o.bodies({ S, space, say, life }) : o.bodies || []).map((b) => new M.body.Body(S, b));
+  const clicks = new M.clicks.Clicks();
   const pinch = new M.hands.Pinch(), poke = new M.menus.Poke(), follower = new M.follow.Follower(), grips = new M.grab.Grips();
   const wins = (o.windows || []).map((d, i) => ({ d, id: d.id, w: d.w || 0.5, h: 0.3, f: new M.follow.Follower({ dist: d.dist || 0.8, bearing: d.bearing === undefined ? 0.5 : d.bearing }),
     panel: null, lay: null, layAt: -1e9, redraw: false, pinch: new Map(), drag: null, order: i }));
@@ -178,6 +179,7 @@ export async function createApp(o) {
   // ---- mixed reality
   if (navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSupported('immersive-ar').then((ok) => { $('enter').hidden = !ok; if (!ok) $('xrNote').textContent = 'no mixed reality in this browser: desktop rehearsal'; });
   $('enter').onclick = async () => {
+    clicks.unlock();                                           // (the menu's clicks: a page may make no sound before a tap)
     try {
       xr = await enterXR({ renderer, life, onReset: (F) => keeper && keeper.reset(F), onEnd: ended, onVisibility: (v) => { if (v === 'hidden') away(); } });
     } catch (e) { $('xrNote').textContent = `Could not start mixed reality: ${e && e.message ? e.message : e}`; return; }
@@ -211,10 +213,18 @@ export async function createApp(o) {
   canvas.addEventListener('pointermove', (ev) => { if (!mouse) return; pointer(ev); if (ray.ray.intersectPlane(floorPlane, hitP)) mouse = { x: hitP.x, y: -hitP.z, pinch: ev.shiftKey, fist: ev.ctrlKey }; });
   canvas.addEventListener('pointerup', () => { mouse = null; });
   canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
-  let pressedLook = { key: null, id: null, t: -1e9 };
+  // a click of the mouse (no depth to it): the button shows pressed for a quarter of a second, with both clicks
+  const flash = { key: null, id: null, t: -1e9, up: false };
   function pressed(owner, id, key) {
-    pressedLook = { key: key || (owner === null || owner === S.me ? 'own:main' : `${owner}:main`), id, t: performance.now() };
-    S.press(owner === S.me ? null : owner, id);
+    flash.key = key || (owner === null || owner === S.me ? 'own:main' : `${owner}:main`); flash.id = id; flash.t = performance.now(); flash.up = false;
+    click('press', flash.key, id);
+    act(owner, id);
+  }
+  const act = (owner, id) => S.press(owner === S.me ? null : owner, id);
+  let remoteHeld = new Set(), panelList = [];                                           // this frame's panels (menus.js Poke's), for where a click comes from
+  function click(kind, key, id) {
+    const pn = panelList.find((q) => q.key === key), at = pn && M.menus.buttonAt(pn, id);
+    if (at) clicks.play(kind, at.cm2, at.pos);
   }
 
   // ---- every frame
@@ -453,13 +463,29 @@ export async function createApp(o) {
     }
     for (const pn of list) pn.h = pn.w * pn.lay.h / pn.lay.w;
     lastMenuH = list[0].h; lastHandsXR = handsXR;
-    let hover = null;
-    if (tips.length) {
-      const r = poke.update(list, tips, now);
-      hover = r.hover;
-      for (const key of r.busy) busyKeys.add(key);
-      for (const pr of r.presses) pressed(pr.owner, pr.button, pr.key);
+    panelList = list;
+    // what fingertips touch (docs/WRIST-MENU-SPEC.md, "A press"): ours, the mouse's click, and the other players' (they come in the `M` packet's
+    // info.touch, so that a button pressed by someone else goes down on every page)
+    const touching = new Map(), mine = [], camPos = [hd[0], hd[3] + space.floorY, -hd[1]];
+    const addTouch = (key, button, held, d) => { const s = M.menus.shape(held, d); if (!touching.has(key)) touching.set(key, []); touching.get(key).push({ button, top: s.top, push: s.push, held }); };
+    const r = poke.update(list, tips, now);
+    for (const key of r.busy) busyKeys.add(key);
+    for (const t of r.touches) { addTouch(t.key, t.button, t.held, t.d); if (mine.length < 4) mine.push({ o: t.owner === null ? -1 : t.owner, p: t.panel, b: t.button, h: t.held ? 1 : 0, d: Math.round(t.d * 1000) }); }
+    for (const pr of r.presses) { click('press', pr.key, pr.button); act(pr.owner, pr.button); }
+    for (const rl of r.releases) click('release', rl.key, rl.button);
+    if (flash.id) { if (now - flash.t < 250) addTouch(flash.key, flash.id, true, 0.012); else { click('release', flash.key, flash.id); flash.id = null; } }
+    if (mine.length) ownInfo.touch = mine;
+    const heldNow = new Set();
+    for (const q of menus.others(now)) for (const t of (q.info && Array.isArray(q.info.touch) ? q.info.touch.slice(0, 4) : [])) {
+      if (!t || typeof t.p !== 'string' || typeof t.b !== 'string' || !Number.isFinite(t.d) || !Number.isFinite(t.o)) continue;
+      const key = t.o === -1 ? `${q.slot}:${t.p}` : t.o === S.me ? `own:${t.p}` : `${t.o}:${t.p}`;
+      addTouch(key, t.b, !!t.h, t.d / 1000);
+      if (t.h) { const id = `${q.slot}|${key}|${t.b}`; heldNow.add(id); if (!remoteHeld.has(id)) click('press', key, t.b); }
     }
+    for (const id of remoteHeld) if (!heldNow.has(id)) { const [, key, b] = id.split('|'); click('release', key, b); }
+    remoteHeld = heldNow;
+    const cp = Math.cos(hd[4] || 0);
+    clicks.listen(camPos, [cp * Math.cos(hd[2]), Math.sin(hd[4] || 0), -cp * Math.sin(hd[2])], [0, 1, 0]);
     // the handle under our menu: a pinch that starts at it carries the menu; where it is let go is where it stays
     let handle = 'idle';
     for (const h of handsXR) {
@@ -487,9 +513,12 @@ export async function createApp(o) {
       if (pn.key === 'own:main') q.panel.handleLook(handle);
       Object.assign(q, { owner: pn.owner, id: pn.id, lay: pn.lay, pose: pn.pose });
       q.panel.pose(pn.pose);
-      if (redraw || pressedLook.key === pn.key) {
+      const l0 = q.panel.lay, force = !l0 || l0.folded !== pn.lay.folded || l0.w !== pn.lay.w || l0.h !== pn.lay.h;       // (a menu that unfolds changes its layout at once)
+      q.panel.touch(touching.get(pn.key) || []);
+      q.panel.tick(dt, camPos);
+      if (redraw || force) {
         const sayNote = pn.owner === null && now - sayT < 3000 ? $('say').textContent : undefined;
-        q.panel.draw(pn.lay, { hover: hover && hover.key === pn.key ? hover.button : null, pressed: pressedLook.key === pn.key && now - pressedLook.t < 250 ? pressedLook.id : null,
+        q.panel.draw(pn.lay, {
           edge: pn.owner === null ? null : PLAYER_COLOURS[pn.owner % PLAYER_COLOURS.length],
           note: sayNote || (pn.id === 'wrist' ? (pn.owner === null ? lineup.note() : (otherNote(pn.owner) || `player ${pn.owner + 1}`)) : (pn.owner === null ? '' : `player ${pn.owner + 1}`)) });
       }

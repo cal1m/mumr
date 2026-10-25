@@ -18,9 +18,13 @@
   const ACTIONS = ['lineUp', 'p1create', 'p1delete', 'p1lock', 'p2create', 'p2delete', 'p2lock', 'p3create', 'p3delete', 'p3lock'];
 
   // three rows for menus.grid from Aligner.fields(): the spot's state, then Create / Delete / Lock (also for another player's menu)
+  // what one spot's field says: armed (waiting for a fingertip), placed (how far up), or empty
+  function stateText(f, k) {
+    return f.armed ? (f.left ? `keep still: ${f.left} s` : 'rest a fingertip') : f.placed ? `placed${f.mm === null || f.mm === undefined ? '' : `, ${f.mm} mm up`}` : k < 2 ? 'empty' : 'no check mark';
+  }
   function rowsFrom(fields, lined) {
     return (fields || []).map((f, k) => {
-      const state = f.armed ? (f.left ? `keep still: ${f.left} s` : 'rest a fingertip') : f.placed ? `placed${f.mm === null || f.mm === undefined ? '' : `, ${f.mm} mm up`}` : k < 2 ? 'empty' : 'no check mark';
+      const state = stateText(f, k);
       return [
         { label: k < 2 ? `Spot ${k + 1}` : 'Spot 3: check', value: state, span: 2, active: !!f.armed },
         { id: `p${k + 1}create`, label: f.armed ? 'Cancel' : f.placed ? 'Replace' : 'Create', active: !!f.armed, off: !!f.locked || (k === 2 && !lined) },
@@ -164,5 +168,5 @@
     }
   }
 
-  M.lineup = { LineUp, ACTIONS, rowsFrom };
+  M.lineup = { LineUp, ACTIONS, rowsFrom, stateText };
 })(typeof module !== 'undefined' ? (module.exports = require('./ns.js')) : (globalThis.MUMR = globalThis.MUMR || {}));

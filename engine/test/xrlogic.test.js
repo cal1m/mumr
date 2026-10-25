@@ -52,15 +52,48 @@ test('a fingertip through a button from the front presses it once; from behind i
   const step = (z, t) => P.update([pn], [{ id: 'r', p: at(z) }], t);
   assert.strictEqual(step(0.03, 0).hover.button, 'plus');
   assert.deepStrictEqual(step(0.01, 10).presses, []);
-  assert.deepStrictEqual(step(-0.005, 20).presses.map((q) => q.button), ['plus']);
-  assert.deepStrictEqual(step(0.01, 30).presses, []);
-  assert.deepStrictEqual(step(-0.01, 600).presses.map((q) => q.button), ['plus'], 'again after it came back out');
+  assert.deepStrictEqual(step(-0.005, 20).presses, [], 'pushing: 0 to 1 cm into the button presses nothing');
+  assert.deepStrictEqual(step(-0.011, 30).presses.map((q) => q.button), ['plus'], 'pressed at 1 cm');
+  assert.deepStrictEqual(step(-0.02, 40).presses, [], 'once, on the way down only');
+  const r = step(0.001, 50);
+  assert.deepStrictEqual([r.releases.map((q) => q.button), r.presses], [['plus'], []], 'back up to the surface: it lets go');
+  step(0.03, 70);
+  assert.deepStrictEqual(step(-0.012, 80).presses.map((q) => q.button), ['plus'], 'again after coming in from the top');
   const Q = new M.menus.Poke();
   Q.update([pn], [{ id: 'r', p: at(-0.03) }], 0);
   assert.deepStrictEqual(Q.update([pn], [{ id: 'r', p: at(-0.001) }], 10).presses, [], 'coming from behind');
+  assert.deepStrictEqual(Q.update([pn], [{ id: 'r', p: at(-0.02) }], 20).presses, [], 'and not pushed through either');
   assert.ok(step(0.1, 700).busy.has('0:main'), 'a hand near it keeps it from gliding away');
   assert.ok(!step(0.1, 800).at.has('0:main'), '10 cm away is near, not at it');
   assert.ok(step(0.03, 900).at.has('0:main'), '3 cm over it is at it');
+});
+
+test('a held button: depth shapes, one button at a time, and letting go sideways', () => {
+  const { shape } = M.menus;
+  assert.deepStrictEqual(shape(false, -0.03), { top: 0.004, push: 0 });
+  assert.deepStrictEqual(shape(true, 0.011), { top: -0.011, push: 0 });
+  assert.deepStrictEqual(shape(true, 0.003), { top: -0.01, push: 0 }, 'held and drawn back a little: stays down 1 cm');
+  near(shape(true, 0.04).top, -0.025, 1e-9, 'the button stops at 2.5 cm'); near(shape(true, 0.04).push, 0.0015, 1e-9, 'the menu gives 1 mm per extra cm');
+  const lay = M.menus.grid({ w: 1000, rows: [[{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }]] });
+  const pn = { key: 'k', owner: null, id: 'main', pose: { x: 0, y: 0, h: 1, yaw: 0, pitch: 0 }, w: 0.5, h: 0.5 * lay.h / lay.w, lay }, A = M.menus.axes(pn.pose);
+  const centre = (id) => { const b = lay.buttons.find((q) => q.id === id); return [(b.x + b.w / 2) / lay.w, (b.y + b.h / 2) / lay.h]; };
+  const at = (id, z, side = 0) => { const [u, v] = centre(id); return [0, 1, 2].map((i) => A.pos[i] + A.right[i] * ((u - 0.5) * pn.w + side) + A.up[i] * (0.5 - v) * pn.h + A.normal[i] * z); };
+  const P = new M.menus.Poke(), go = (tips, t) => P.update([pn], tips, t);
+  go([{ id: 'r', p: at('a', 0.03) }, { id: 'l', p: at('b', 0.03) }], 0);
+  assert.strictEqual(go([{ id: 'r', p: at('a', -0.012) }, { id: 'l', p: at('b', 0.03) }], 10).presses.length, 1);
+  assert.deepStrictEqual(go([{ id: 'r', p: at('a', -0.012) }, { id: 'l', p: at('b', -0.02) }], 20).presses, [], 'another hand cannot press while one is held');
+  const o = go([{ id: 'r', p: at('a', -0.03) }], 30);
+  assert.deepStrictEqual(o.touches.map((q) => [q.button, q.held]), [['a', true]]);
+  assert.deepStrictEqual(go([{ id: 'r', p: at('a', -0.4) }], 35).touches.map((q) => q.held), [true], 'still held 40 cm in');
+  assert.strictEqual(go([{ id: 'r', p: at('a', -0.6) }], 36).releases.length, 1, 'past 50 cm it lets go');
+  go([{ id: 'r', p: at('a', 0.03) }], 37); go([{ id: 'r', p: at('a', -0.012) }], 38);
+  go([{ id: 'r', p: at('a', -0.03) }], 39);
+  const side = go([{ id: 'r', p: at('a', -0.02, 0.5) }], 40);
+  assert.deepStrictEqual(side.releases.map((q) => q.button), ['a'], 'far to the side: it lets go');
+  assert.deepStrictEqual(go([{ id: 'r', p: at('a', -0.02) }], 50).presses, [], 'coming back sideways presses nothing');
+  go([{ id: 'r', p: at('a', -0.02) }], 60);
+  const gone = go([], 70);
+  assert.deepStrictEqual(gone.releases.length, 0, 'nothing held, nothing to let go');
 });
 
 test('everyone\'s menus: a panel of A floats at the same real place for B, whose frame is turned and shifted', () => {
