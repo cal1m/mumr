@@ -32,10 +32,11 @@ headset (section 4 says what is missing); **not started**. Rows are in the order
 | Phase | What | State |
 |---|---|---|
 | 0 | Repo, notes, refreshed plan | **done** 2026-10-22 |
-| 1 | Core without THREE: server (`ws`, `hub`, `serverlog`, `serve`), client (`util`, `link`, `align`, `wire`, `session`, `presence`, `body`, `worldfeed`, `life`), tests, `examples/counter` | **done** 2026-10-22 (the counter itself never ran on a headset; everything it proves runs under the cube) |
+| - | App structure: engine under engine/, apps in apps/, apps/_template, tools/new-app.js and tools/run.js, APPS.md (docs/superpowers/plans/2026-10-25-app-structure.md) | **done** 2026-10-25 (checked in browser tabs; the cube after the move is not yet run on headsets) |
+| 1 | Core without THREE (now under `engine/`): server (`ws`, `hub`, `serverlog`, `serve`), client (`util`, `link`, `align`, `wire`, `session`, `presence`, `body`, `worldfeed`, `life`), tests, the counter, since folded into `apps/_template` (counter folder removed 2026-10-25) | **done** 2026-10-22 (the counter itself never ran on a headset; everything it proves runs under the cube) |
 | 2 | Everyone's menus: panel poses through `Space`, the `M` stream, the other player's menu drawn from that player's state and mode, a press on anyone's menu | **done** 2026-10-22 (two-headset run) |
 | 3 | XR glue (`xr/`): session start, hand sources from the 25 joints, pinch rule, line-up on `Aligner`, persistent anchor + reset handling, ghost hands of others, build-stamp self-reload, **hand cutouts** (`xr/handmask.js`, Nudgy's depth-only hand model with its 24 mm tip reach, ported 10-23) | **done** (cutouts: "work good", 10-23) |
-| 4 | `examples/cube`: one cube (a Body), a menu, both players' hands; PC rehearsal, then headsets | **done** 2026-10-22; two-headset run worked; faults fixed (NOTES 22-28) |
+| 4 | `apps/cube`: one cube (a Body), a menu, both players' hands; PC rehearsal, then headsets | **done** 2026-10-22; two-headset run worked; faults fixed (NOTES 22-28) |
 | 4c | Coming back after a Wi-Fi drop (the hub keeps a dropped player's place for 10 s) | **done**: seen on the headsets ("came back to its place" in the logs of 10-22/23) |
 | 6 | Host role: a Node process on the PC holds the bodies nobody touches, the server starts and restarts it | **done**: the headsets saw the cube "simulated by host" and the hand-over both ways |
 | 6b | `xr/app.js` `createApp({...})`: the page wiring every app repeated | **done**; the cube page is the cube only |
@@ -56,7 +57,7 @@ after a run in which the PC view is open (section 4).
 
 ## 3. Next, in this order
 
-1. **One headset session for section 4** (about 15 minutes, one headset is enough for most of it; the list says which items need two).
+1. **One headset session for section 4** (about 15 minutes, one headset is enough for most of it; the list says which items need two). Also check the cube still loads and plays after the engine/ move.
 2. **The experiment pages (3.1)**, then Marek runs them: they decide phase 5.
 3. **Phase 5, many bodies (3.2)**, shaped by what the experiments measured.
 4. **Camera row** of the line-up menu, when a webcam page is wanted.
@@ -64,15 +65,15 @@ after a run in which the PC view is open (section 4).
 
 ### 3.1 Experiment and stress pages (to build)
 
-Each is an app in `examples/` built on `createApp`, with its numbers in the life log (so `mumr-server.log` has them after the run, with
+Each is an app in `apps/` built on `createApp`, with its numbers in the life log (so `mumr-server.log` has them after the run, with
 nothing to copy off the headset) and on its menu. Every page has a rehearsal mode on the PC (`?name=A&frame=...&room=demo`) and a Node
 test of its logic with pretend headsets, as the cube has. Start the server and check that the log grows before anyone puts a headset on.
 
 | Page | What it measures | How it is built | How it is run, and what passes |
 |---|---|---|---|
-| `examples/pile` (?n=10/20/30/50) | Quest frame time with N bodies simulated; later, hand-over jitter | N cubes on the floor in a grid, a button that drops them into one pile. **Needs cube-to-cube contact first** (cube.js only knows hands and the room): boxes as turned squares, support from the highest box under the footprint (as the room's `support`, NOTES 30), push-out between boxes in the same 1 cm steps. Before phase 5 every cube is simulated on every page with no sharing (the measurement is the page's own cost). The page logs every 5 s: frames per second, frame time p50/p95 (ms), simulation time per frame (ms), N, how many cubes are moving | One headset: run n = 10, 20, 30, 50; poke the pile. Pass: frame time p95 under 13.9 ms (72 Hz) at 30 cubes, the pile comes to rest. The result says how many bodies one page can simulate, and so whether sleeping bodies (phase 5) are needed or only nice |
-| `examples/drift` | How far the line-up drifts over 10 minutes: one headset against the room, two headsets against each other | Uses the line-up's check mark (spot 3) as it is: a printed cross, a timer that every minute says "touch the cross", and on the touch logs where the fingertip is against where the line-up says the cross is (mm, and the mm between the two players when both touch). Ten rows in the log; a menu shows the last and the largest | Alone: line up, then 10 minutes walking about, touching the cross each minute. Two: both do it on the same cross. Pass: under 2 cm after 10 minutes; if not, the anchor keeper needs a re-check timer (anchor.js) |
-| `examples/island` (after `pile` has contact) | What happens to a stack when two players touch it at once | A stack of 3-5 cubes; one player pushes the bottom while the other lifts the top. With today's one token per body each cube changes hands on touch; the page logs token hand-overs per second, jumps of a cube (> 2 cm between two drawn frames) and whether the stack stayed together | Two headsets. First run shows today's failure (the baseline). Phase 5's islands (one token for a touching group) pass when the stack moves as one with no jumps |
+| `apps/pile` (?n=10/20/30/50) | Quest frame time with N bodies simulated; later, hand-over jitter | N cubes on the floor in a grid, a button that drops them into one pile. **Needs cube-to-cube contact first** (cube.js only knows hands and the room): boxes as turned squares, support from the highest box under the footprint (as the room's `support`, NOTES 30), push-out between boxes in the same 1 cm steps. Before phase 5 every cube is simulated on every page with no sharing (the measurement is the page's own cost). The page logs every 5 s: frames per second, frame time p50/p95 (ms), simulation time per frame (ms), N, how many cubes are moving | One headset: run n = 10, 20, 30, 50; poke the pile. Pass: frame time p95 under 13.9 ms (72 Hz) at 30 cubes, the pile comes to rest. The result says how many bodies one page can simulate, and so whether sleeping bodies (phase 5) are needed or only nice |
+| `apps/drift` | How far the line-up drifts over 10 minutes: one headset against the room, two headsets against each other | Uses the line-up's check mark (spot 3) as it is: a printed cross, a timer that every minute says "touch the cross", and on the touch logs where the fingertip is against where the line-up says the cross is (mm, and the mm between the two players when both touch). Ten rows in the log; a menu shows the last and the largest | Alone: line up, then 10 minutes walking about, touching the cross each minute. Two: both do it on the same cross. Pass: under 2 cm after 10 minutes; if not, the anchor keeper needs a re-check timer (anchor.js) |
+| `apps/island` (after `pile` has contact) | What happens to a stack when two players touch it at once | A stack of 3-5 cubes; one player pushes the bottom while the other lifts the top. With today's one token per body each cube changes hands on touch; the page logs token hand-overs per second, jumps of a cube (> 2 cm between two drawn frames) and whether the stack stayed together | Two headsets. First run shows today's failure (the baseline). Phase 5's islands (one token for a touching group) pass when the stack moves as one with no jumps |
 | `tools/stress.js` (Node, no headset) | Hub and network load for many players and bodies | Starts N pretend players (`tools/standin.js` does one) that send presence at 45/s and own M moving bodies each, against the real server; logs packets/s in and out, the hub's CPU, and the delay from send to receive | PC only: 4 players x 30 bodies. Pass: no queue growth, delay under 30 ms on localhost. Run again over Wi-Fi with two machines when phase 5 has its packet |
 
 ### 3.2 Phase 5 (when the experiments are in)
@@ -131,7 +132,7 @@ session with the server log running first (loco, balls, marks, room, settings, m
 ## 6. Definition of done (for the extraction as a whole)
 
 - The engine works on its own: its tests pass without Nudgy's files. **(done: 101 Node, 48 Python on 2026-10-25)**
-- `examples/cube` runs with two tabs and on two headsets. **(done 2026-10-22/23)**
+- `apps/cube` runs with two tabs and on two headsets. **(done 2026-10-22/23)**
 - The experiments of 3.1 have been run and phase 5 is built or decided against.
 - Nothing in section 4 is left untested.
 - Nudgy runs on MUMR with its tests green and one two-headset session as before, **or** Marek decided it stays as it is.
