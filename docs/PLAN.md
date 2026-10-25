@@ -96,17 +96,18 @@ From the server logs of 10-22/23 and Marek's answers of 10-25. Each line says ho
 
 | What | Since | How to test it | Marek's answer 10-25 |
 |---|---|---|---|
-| A cube put on a flat hand (palm up and back of the hand up), carried, falling off when the hand tilts | 10-23 | Make the hand flat, put the cube on it with the other hand; walk; turn the hand over; tilt it past about 45 degrees | not tried |
-| One finger pushes the cube (the fix for "I can't push it with one finger") | 10-23 | Point and push the cube along the floor with the index | not tried |
-| Grabbing the cube with a fist; the finger colours (green pinch, orange fist) | 10-22 | Make a fist at the cube, carry it, open; watch the colours | not tried |
+| A cube put on a flat hand (palm up and back of the hand up), carried, falling off when the hand tilts | 10-23 | Make the hand flat, put the cube on it with the other hand; walk; turn the hand over; tilt it past about 45 degrees | **10-25 ran**: carried, glued to the hand; tilted past 45 degrees it drops through the hand (good enough for now); the cube's collision and rotation are poor |
+| One finger pushes the cube (the fix for "I can't push it with one finger") | 10-23 | Point and push the cube along the floor with the index | **10-25 works well** |
+| Grabbing the cube with a fist; the finger colours (green pinch, orange fist) | 10-22 | Make a fist at the cube, carry it, open; watch the colours | **10-25 works well** (log: held by player 1 for 24 s, then back to the host) |
 | Another player pressing your room picker's map | 10-23 | Two headsets: A presses Upload with a two-room scan; B picks a room on A's wrist menu and presses Import | not tried |
 | The PC view during a headset run (models, hand wall, pointing rays, the 300 ms lag line) | 10-23 | Open `view.html` on the PC during any run; afterwards read the "late by their stamps" lines in the log | not tried |
-| The fist moves the room model, your menu and the viewer (the viewer along the walls) | 10-23 | Fist inside the model, carry; fist on the menu, carry; fist on the hand wall, slide it to another wall; check the cube is not grabbed by that fist | built after the last run |
-| The hand wall's tube hands, redrawn every frame (and the frame rate with it on) | 10-25 | Look at the hand wall while making each gesture | built after the last run |
-| Show hand IRL in a model scaled way down: the whole hand, as thick as it is long | 10-23 | Scale the model down with the pill, reach in | built after the last run |
-| The scan log spam fix: one "scan has N planes" line, not thousands | 10-25 | After any run, count those lines in `mumr-server.log` | built after the last run |
+| The fist moves the room model, your menu and the viewer (the viewer along the walls) | 10-23 | Fist inside the model, carry; fist on the menu, carry; fist on the hand wall, slide it to another wall; check the cube is not grabbed by that fist | **10-25 works as expected**: the fist only grabs whole things |
+| The hand wall's tube hands, redrawn every frame (and the frame rate with it on) | 10-25 | Look at the hand wall while making each gesture | **10-25 works** (tube hands redraw, rate fine) |
+| Show hand IRL in a model scaled way down: the whole hand, as thick as it is long | 10-23 | Scale the model down with the pill, reach in | **10-25 works** |
+| The scan log spam fix: one "scan has N planes" line, not thousands | 10-25 | After any run, count those lines in `mumr-server.log` | **10-25 not fixed**: the line still repeats every few seconds (40 planes each time) |
 | Feet `show` and `kick` | 10-22 | Set `feet: 'show'` in the cube's `app.js`, look down; then `'kick'` and kick the cube | "pretty sure those work" (never ran) |
 
+Found on 2026-10-25 (one headset): the Quest's floor level had drifted about 40 cm (head read 130 cm, then 165 cm after a restart); a restart plus deleting the old saved rooms in Quest settings fixed it, and a bad scan then had two nested rooms. Resets now log their height (`xr: reset height`) and the head height is logged every 4 s (`xr: head`). The room picker presses the smallest room first (a small room inside a big one can be picked). Still open: the session ended a few seconds after Room setup three times (no cause in the log); the PC view lag line (no PC view was open); the two-headset rows.
 Tested and working on the headset (for the record): pointing, rays and signs (10-23); hand cutouts; the room model with two players;
 the room picker (one player); the scale pill and Show hand IRL; the cube held from the model; the room upload rules; collisions with
 the room; rejoining after a drop; the host; the wrist menu; lining up.

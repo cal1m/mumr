@@ -32,6 +32,7 @@ export async function enterXR({ renderer, life = () => {}, onReset = () => {}, o
   if (xr.refSpace && xr.refSpace.addEventListener) {
     xr.refSpace.addEventListener('reset', (ev) => {
       const t = ev && ev.transform;
+      if (t) life(`xr: reset height ${Math.round(t.position.y * 100)} cm (up), position ${Math.round(t.position.x * 100)}, ${Math.round(t.position.z * 100)} cm`);
       onReset(t ? M().align.frameFromPose(t.position, t.orientation) : null);
     });
   }

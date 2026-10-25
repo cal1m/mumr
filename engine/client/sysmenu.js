@@ -43,6 +43,8 @@
       if (bh < 70) { by -= (70 - bh) / 2; bh = 70; }
       return { id: `roomPick${r.k + 1}`, label: `Room ${r.k + 1}${r.here ? ' (you)' : ''}`, value: `${r.w} x ${r.d} m`, x: bx, y: by, w: bw, h: bh, active: r.picked, off: false, ghost: true };
     });
+    // (a press goes to the first button under the fingertip: the smallest room first, so a room inside a bigger one can still be picked)
+    buttons.sort((a, b) => a.w * a.h - b.w * b.h);
     const n = ch.rooms.filter((r) => r.picked).length, by = MAP.y + MAP.h + 14, bh = 84;
     buttons.push({ id: 'roomCancel', label: 'Cancel', value: '', x: 14, y: by, w: 240, h: bh, active: false, off: false },
       { id: 'roomImport', label: 'Import', value: `${n} of ${ch.rooms.length} rooms`, x: 268, y: by, w: 486, h: bh, active: n > 0, off: n === 0 });

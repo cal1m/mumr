@@ -128,18 +128,28 @@ test('Upload with two rooms asks which: the map in the line-up menu, a press pic
   assert.match(said.join(' '), /2 rooms/);
   let lay = M.sysmenu.SysMenu.layout(sys.info());
   assert.strictEqual(lay.title.text, 'Import rooms'); assert.strictEqual(lay.shapes.length, 2);
-  assert.deepStrictEqual(lay.buttons.map((b) => b.id), ['roomPick1', 'roomPick2', 'roomCancel', 'roomImport']);
-  assert.deepStrictEqual(lay.buttons.slice(0, 2).map((b) => b.active), [false, true], 'the room you stand in is picked first');
+  const picks = () => ['roomPick1', 'roomPick2'].map((id) => lay.buttons.find((b) => b.id === id).active);       // (the smallest room's button comes first)
+  assert.deepStrictEqual(lay.buttons.map((b) => b.id).sort(), ['roomCancel', 'roomImport', 'roomPick1', 'roomPick2']);
+  assert.deepStrictEqual(picks(), [false, true], 'the room you stand in is picked first');
   assert.ok(M.sysmenu.SysMenu.width(sys.info()) > M.sysmenu.OPEN_W, 'the map is wider');
   const at = (id) => { const b = lay.buttons.find((q) => q.id === id); return [(b.x + b.w / 2) / lay.w, (b.y + b.h / 2) / lay.h]; };
   assert.strictEqual(M.menus.hit(lay, ...at('roomPick1')), 'roomPick1', 'a room on the map is a button');
   sys.press('roomPick1'); lay = M.sysmenu.SysMenu.layout(sys.info());
-  assert.deepStrictEqual(lay.buttons.slice(0, 2).map((b) => b.active), [true, true]);
+  assert.deepStrictEqual(picks(), [true, true]);
   sys.press('roomImport'); hub.flush();
   assert.strictEqual(S.doc.room.data.planes.length, 6, 'both rooms');
   assert.strictEqual(R.choice, null); assert.notStrictEqual(M.sysmenu.SysMenu.layout(sys.info()).title.text, 'Import rooms');
   sys.press('supplyRoom'); sys.press('roomPick2'); sys.press('roomCancel'); hub.flush();
   assert.strictEqual(S.doc.room.data.planes.length, 6, 'Cancel: nothing went up');
+});
+
+test('a room inside a bigger one can still be pressed on the map: the smallest button is hit first', () => {
+  const sq = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+  const lay = M.sysmenu.SysMenu.layout({ open: true, room: { choice: { rooms: [
+    { k: 0, w: 8, d: 6, n: 3, here: false, picked: false, poly: sq(0, 0, 8, 6) },
+    { k: 1, w: 2, d: 2, n: 3, here: true, picked: true, poly: sq(3, 2, 5, 4) }] } } });
+  const b = lay.buttons.find((q) => q.id === 'roomPick2');
+  assert.strictEqual(M.menus.hit(lay, (b.x + b.w / 2) / lay.w, (b.y + b.h / 2) / lay.h), 'roomPick2');
 });
 
 test('the scale pill: pulled out it grows the model, pushed in it shrinks it, within K_MIN..K_MAX; the room maps through the scale', () => {

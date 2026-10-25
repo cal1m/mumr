@@ -210,7 +210,7 @@ export async function createApp(o) {
   }
 
   // ---- every frame
-  let head = [0, 0, 0, 1.6, 0], redrawAt = 0, drag = null, statusAt = 0;
+  let head = [0, 0, 0, 1.6, 0], redrawAt = 0, drag = null, statusAt = 0, headLogAt = 0;
   const handPinch = new Map(), v3 = new THREE.Vector3(), planeState = {};
   function readHead(frame) {
     if (frame && xr) {
@@ -236,6 +236,7 @@ export async function createApp(o) {
     if (xr) xr.frame = frame || null;
     if (keeper && frame) keeper.update();
     head = readHead(frame);
+    if (xr && frame && now - headLogAt > 4000) { headLogAt = now; life(`xr: head ${Math.round(head[3] * 100)} cm above the floor, world raised ${Math.round(space.floorY * 100)} cm`); }
     // this page's hands: in mixed reality the tracked hands; on the desktop the mouse while its button is down
     let own = [], tips = [], feet = [], handsXR = [];
     if (xr && frame) {
